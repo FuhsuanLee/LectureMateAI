@@ -10,11 +10,17 @@ import TipKit
 
 struct FlashcardReviewView: View {
     let flashcards: [Flashcard]
+    let deckTitle: String
 
     @State private var currentIndex = 0
     @State private var isFlipped = false
 
     private let tip = FlashcardTip()
+
+    init(flashcards: [Flashcard], deckTitle: String = "Flashcards") {
+        self.flashcards = flashcards
+        self.deckTitle = deckTitle
+    }
 
     var body: some View {
         VStack(spacing: 24) {
@@ -60,7 +66,8 @@ struct FlashcardReviewView: View {
             Spacer()
         }
         .padding()
-        .navigationTitle("Flashcards")
+        .navigationTitle(deckTitle)
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private func movePrevious() {
@@ -93,10 +100,12 @@ struct FlashcardView: View {
                         .fontWeight(.semibold)
                         .multilineTextAlignment(.center)
 
-                    Text("Example: \(flashcard.example)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
+                    if !flashcard.example.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text("Example: \(flashcard.example)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
                 } else {
                     Text(flashcard.term)
                         .font(.largeTitle)

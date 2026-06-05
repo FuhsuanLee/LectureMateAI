@@ -20,6 +20,11 @@ struct MainTabView: View {
                     Label("Courses", systemImage: "books.vertical.fill")
                 }
 
+            FlashcardLibraryView()
+                .tabItem {
+                    Label("Flashcards", systemImage: "rectangle.on.rectangle.fill")
+                }
+
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")

@@ -56,6 +56,197 @@ private enum FileImportError: LocalizedError {
     }
 }
 
+private enum GenerationStage: Equatable {
+    case idle
+    case preparing
+    case extractingPDF
+    case transcribingAudio
+    case generatingMarkdown
+    case savingNote
+    case completed
+
+    var title: String {
+        switch self {
+        case .idle:
+            return "Ready to import"
+        case .preparing:
+            return "Preparing lecture files"
+        case .extractingPDF:
+            return "Extracting PDF text"
+        case .transcribingAudio:
+            return "Transcribing audio"
+        case .generatingMarkdown:
+            return "Generating markdown note"
+        case .savingNote:
+            return "Saving lecture note"
+        case .completed:
+            return "Lecture note saved"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .idle:
+            return "Upload one lecture audio or video file and one PDF. The transcript and PDF text will be processed automatically when you generate the note."
+        case .preparing:
+            return "Checking the selected files and getting everything ready for AI processing."
+        case .extractingPDF:
+            return "Reading text from your PDF slides with PDFKit."
+        case .transcribingAudio:
+            return "Sending the lecture audio to OpenAI and creating a transcript."
+        case .generatingMarkdown:
+            return "Combining the transcript and slide text into a structured markdown note."
+        case .savingNote:
+            return "Saving the generated note into the current course."
+        case .completed:
+            return "Your note has been saved. Returning to the course page..."
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .idle:
+            return "square.and.arrow.down.on.square"
+        case .preparing, .extractingPDF, .transcribingAudio, .generatingMarkdown, .savingNote:
+            return "sparkles"
+        case .completed:
+            return "checkmark.circle.fill"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .completed:
+            return .green
+        case .idle:
+            return .secondary
+        case .preparing, .extractingPDF, .transcribingAudio, .generatingMarkdown, .savingNote:
+            return .blue
+        }
+    }
+
+    var progressValue: Double? {
+        switch self {
+        case .idle:
+            return nil
+        case .preparing:
+            return 0.08
+        case .extractingPDF:
+            return 0.2
+        case .transcribingAudio:
+            return 0.5
+        case .generatingMarkdown:
+            return 0.8
+        case .savingNote:
+            return 0.95
+        case .completed:
+            return 1.0
+        }
+    }
+
+    var activeStepIndex: Int? {
+        switch self {
+        case .idle, .completed:
+            return nil
+        case .preparing, .extractingPDF:
+            return 0
+        case .transcribingAudio:
+            return 1
+        case .generatingMarkdown:
+            return 2
+        case .savingNote:
+            return 3
+        }
+    }
+
+    var completedStepCount: Int {
+        switch self {
+        case .idle, .preparing, .extractingPDF:
+            return 0
+        case .transcribingAudio:
+            return 1
+        case .generatingMarkdown:
+            return 2
+        case .savingNote:
+            return 3
+        case .completed:
+            return 4
+        }
+    }
+
+    var isProcessing: Bool {
+        switch self {
+        case .preparing, .extractingPDF, .transcribingAudio, .generatingMarkdown, .savingNote:
+            return true
+        case .idle, .completed:
+            return false
+        }
+    }
+}
+
+private enum ProcessingStep: Int, CaseIterable, Identifiable {
+    case extractPDF
+    case transcribeAudio
+    case generateMarkdown
+    case saveNote
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .extractPDF:
+            return "Extract PDF text"
+        case .transcribeAudio:
+            return "Transcribe audio"
+        case .generateMarkdown:
+            return "Generate markdown"
+        case .saveNote:
+            return "Save to course"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .extractPDF:
+            return "Read slide content with PDFKit"
+        case .transcribeAudio:
+            return "Create a transcript with OpenAI"
+        case .generateMarkdown:
+            return "Combine transcript and slide content"
+        case .saveNote:
+            return "Store the lecture note in SwiftData"
+        }
+    }
+}
+
+private enum ProcessingStepState {
+    case pending
+    case active
+    case complete
+
+    var systemImage: String {
+        switch self {
+        case .pending:
+            return "circle"
+        case .active:
+            return "hourglass.circle.fill"
+        case .complete:
+            return "checkmark.circle.fill"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .pending:
+            return .secondary
+        case .active:
+            return .blue
+        case .complete:
+            return .green
+        }
+    }
+}
+
 struct FileImportGenerateView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -78,7 +269,7 @@ struct FileImportGenerateView: View {
     @FocusState private var isLectureTitleFocused: Bool
 
     @State private var isGeneratingNote = false
-    @State private var currentProgressMessage = ""
+    @State private var generationStage: GenerationStage = .idle
     @State private var errorMessage = ""
 
     private var trimmedLectureTitle: String {
@@ -103,20 +294,9 @@ struct FileImportGenerateView: View {
                     .textFieldStyle(.roundedBorder)
                     .focused($isLectureTitleFocused)
 
-                if isBusy {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label(currentProgressMessage, systemImage: "hourglass")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-
-                        ProgressView()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-
                 VStack(alignment: .leading, spacing: 10) {
-                        Text("Upload Lecture Audio or Video")
-                            .font(.headline)
+                    Text("Upload Lecture Audio or Video")
+                        .font(.headline)
 
                     Button {
                         presentImporter(for: .audio)
@@ -168,6 +348,12 @@ struct FileImportGenerateView: View {
                     }
                 }
 
+                importChecklistCard()
+
+                if isBusy || canGenerateNote || generationStage == .completed {
+                    generationStatusCard()
+                }
+
                 Button {
                     generateMarkdownNote()
                 } label: {
@@ -176,21 +362,19 @@ struct FileImportGenerateView: View {
                             ProgressView()
                         }
 
-                        Text(isGeneratingNote ? "Generating Markdown Note..." : "Generate Markdown Note")
+                        Text(generateButtonTitle)
                             .fontWeight(.semibold)
                     }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(.blue)
-                        .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(.blue)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
                 .disabled(!canGenerateNote)
 
                 if !errorMessage.isEmpty {
-                    Text(errorMessage)
-                        .font(.caption)
-                        .foregroundStyle(.red)
+                    errorCard()
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -203,6 +387,8 @@ struct FileImportGenerateView: View {
         .navigationTitle("Import Lecture")
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
+        .animation(.easeInOut(duration: 0.2), value: isGeneratingNote)
+        .animation(.easeInOut(duration: 0.2), value: generationStage)
         .fileImporter(
             isPresented: $showFileImporter,
             allowedContentTypes: importType?.allowedContentTypes ?? [.data],
@@ -227,8 +413,20 @@ struct FileImportGenerateView: View {
         isLectureTitleFocused = false
     }
 
+    private var generateButtonTitle: String {
+        if isGeneratingNote {
+            return generationStage.title
+        }
+
+        return "Generate Markdown Note"
+    }
+
     private func presentImporter(for type: ImportType) {
+        dismissKeyboard()
         errorMessage = ""
+        if !isGeneratingNote {
+            generationStage = .idle
+        }
         importType = type
 
         DispatchQueue.main.async {
@@ -330,8 +528,9 @@ struct FileImportGenerateView: View {
             return
         }
 
+        dismissKeyboard()
         isGeneratingNote = true
-        currentProgressMessage = "Preparing lecture files..."
+        generationStage = .preparing
         errorMessage = ""
 
         let title = trimmedLectureTitle
@@ -339,21 +538,21 @@ struct FileImportGenerateView: View {
         Task {
             do {
                 await MainActor.run {
-                    currentProgressMessage = "Extracting PDF text..."
+                    generationStage = .extractingPDF
                 }
 
                 let extractedPDFText = try extractPDFText(from: selectedPDFURL)
 
                 await MainActor.run {
                     pdfText = extractedPDFText
-                    currentProgressMessage = "Transcribing audio with OpenAI..."
+                    generationStage = .transcribingAudio
                 }
 
                 let transcribedText = try await openAIService.transcribeAudio(fileURL: selectedAudioURL)
 
                 await MainActor.run {
                     transcript = transcribedText
-                    currentProgressMessage = "Generating markdown note with OpenAI..."
+                    generationStage = .generatingMarkdown
                 }
 
                 let markdown = try await openAIService.generateMarkdownNote(
@@ -363,11 +562,13 @@ struct FileImportGenerateView: View {
                 )
 
                 await MainActor.run {
+                    generationStage = .savingNote
                     saveNote(title: title, markdown: markdown)
                 }
             } catch {
                 await MainActor.run {
                     errorMessage = "Failed to generate note: \(userFacingMessage(for: error))"
+                    generationStage = .idle
                     isGeneratingNote = false
                 }
             }
@@ -377,20 +578,149 @@ struct FileImportGenerateView: View {
     @MainActor
     private func saveNote(title: String, markdown: String) {
         let note = LectureNote(title: title, markdown: markdown)
+        note.flashcards = AIOutputParser.parseFlashcards(from: markdown)
 
         modelContext.insert(note)
         course.notes.append(note)
 
         do {
             try modelContext.save()
-            currentProgressMessage = ""
+            generationStage = .completed
             isGeneratingNote = false
-            dismiss()
+
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                dismiss()
+            }
         } catch {
             errorMessage = "Failed to save note: \(userFacingMessage(for: error))"
-            currentProgressMessage = ""
+            generationStage = .idle
             isGeneratingNote = false
         }
+    }
+
+    private func importChecklistCard() -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("Import Checklist", systemImage: "checklist")
+                .font(.headline)
+
+            checklistRow(
+                title: "Lecture title",
+                detail: trimmedLectureTitle.isEmpty ? "Enter a title for this lecture" : trimmedLectureTitle,
+                isComplete: !trimmedLectureTitle.isEmpty
+            )
+
+            checklistRow(
+                title: "Audio or video",
+                detail: selectedAudioFilename.isEmpty ? "Upload one MP3, MP4, or M4A file" : selectedAudioFilename,
+                isComplete: selectedAudioURL != nil
+            )
+
+            checklistRow(
+                title: "PDF slides",
+                detail: selectedPDFFilename.isEmpty ? "Upload the lecture PDF slides" : selectedPDFFilename,
+                isComplete: selectedPDFURL != nil
+            )
+        }
+        .padding(16)
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func generationStatusCard() -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: generationStage.systemImage)
+                    .font(.title3)
+                    .foregroundStyle(generationStage.tint)
+                    .frame(width: 28)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(statusCardTitle)
+                        .font(.headline)
+
+                    Text(statusCardDetail)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let progressValue = generationStage.progressValue {
+                ProgressView(value: progressValue)
+                    .tint(generationStage.tint)
+            }
+
+            if generationStage.isProcessing || generationStage == .completed {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(ProcessingStep.allCases) { step in
+                        processingStepRow(step: step, state: processingState(for: step))
+                    }
+                }
+                .padding(.top, 4)
+            }
+        }
+        .padding(16)
+        .background(backgroundColor(for: generationStage))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private var statusCardTitle: String {
+        if generationStage == .idle {
+            return "Ready to generate"
+        }
+
+        return generationStage.title
+    }
+
+    private var statusCardDetail: String {
+        if generationStage == .idle {
+            return "When you tap Generate, the app will extract PDF text, transcribe your lecture audio with OpenAI, and save the markdown note automatically."
+        }
+
+        return generationStage.detail
+    }
+
+    private func errorCard() -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Something went wrong", systemImage: "exclamationmark.triangle.fill")
+                .font(.headline)
+                .foregroundStyle(.red)
+
+            Text(errorMessage)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+
+            if let suggestion = recoverySuggestion {
+                Text(suggestion)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(16)
+        .background(.red.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private var recoverySuggestion: String? {
+        let lowercasedMessage = errorMessage.lowercased()
+
+        if lowercasedMessage.contains("api key") {
+            return "Check OpenAIConfig.swift and confirm your local testing API key is still filled in."
+        }
+
+        if lowercasedMessage.contains("pdf") {
+            return "Try a text-based PDF instead of a scanned image PDF, then import it again."
+        }
+
+        if lowercasedMessage.contains("too large") || lowercasedMessage.contains("25 mb") {
+            return "Try a shorter lecture clip or a smaller audio export if the source media is very long."
+        }
+
+        if lowercasedMessage.contains("unsupported") || lowercasedMessage.contains("corrupted") {
+            return "Try another MP3 or M4A file to confirm the source media is readable."
+        }
+
+        return nil
     }
 
     @ViewBuilder
@@ -422,6 +752,68 @@ struct FileImportGenerateView: View {
             .foregroundStyle(.secondary)
     }
 
+    private func checklistRow(title: String, detail: String, isComplete: Bool) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: isComplete ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(isComplete ? .green : .secondary)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            Spacer()
+        }
+    }
+
+    private func processingStepRow(step: ProcessingStep, state: ProcessingStepState) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: state.systemImage)
+                .foregroundStyle(state.tint)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(step.title)
+                    .font(.subheadline.weight(.semibold))
+
+                Text(step.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+        }
+    }
+
+    private func processingState(for step: ProcessingStep) -> ProcessingStepState {
+        if generationStage.completedStepCount > step.rawValue {
+            return .complete
+        }
+
+        if generationStage.activeStepIndex == step.rawValue {
+            return .active
+        }
+
+        return .pending
+    }
+
+    private func backgroundColor(for stage: GenerationStage) -> Color {
+        switch stage {
+        case .completed:
+            return .green.opacity(0.10)
+        case .idle:
+            return .blue.opacity(0.08)
+        case .preparing, .extractingPDF, .transcribingAudio, .generatingMarkdown, .savingNote:
+            return .blue.opacity(0.10)
+        }
+    }
+
     private func userFacingMessage(for error: Error) -> String {
         if let localizedError = error as? LocalizedError,
            let description = localizedError.errorDescription,
@@ -431,4 +823,20 @@ struct FileImportGenerateView: View {
 
         return error.localizedDescription
     }
+}
+
+#Preview {
+    NavigationStack {
+        FileImportGenerateView(course: previewImportCourse)
+    }
+    .modelContainer(for: [
+        Course.self,
+        LectureNote.self,
+        Flashcard.self,
+        QuizQuestion.self
+    ], inMemory: true)
+}
+
+private var previewImportCourse: Course {
+    Course(title: "Data Structures")
 }

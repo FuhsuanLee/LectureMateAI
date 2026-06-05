@@ -106,3 +106,38 @@ struct CourseListView: View {
         }
     }
 }
+
+#Preview {
+    CourseListViewPreview()
+        .modelContainer(for: [
+            Course.self,
+            LectureNote.self,
+            Flashcard.self,
+            QuizQuestion.self
+        ], inMemory: true)
+}
+
+private struct CourseListViewPreview: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Course.createdAt, order: .reverse) private var courses: [Course]
+    @State private var hasSeeded = false
+
+    var body: some View {
+        CourseListView()
+            .task {
+                guard !hasSeeded, courses.isEmpty else { return }
+
+                let course = Course(title: "iOS App Development")
+                let note = LectureNote(
+                    title: "Week 12 - SwiftUI Navigation",
+                    markdown: "# Preview Note\n\n## Summary\nThis is a preview lecture note."
+                )
+
+                course.notes.append(note)
+                modelContext.insert(course)
+
+                try? modelContext.save()
+                hasSeeded = true
+            }
+    }
+}

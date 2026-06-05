@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct CourseDetailView: View {
     let course: Course
@@ -38,4 +39,45 @@ struct CourseDetailView: View {
             }
         }
     }
+}
+
+#Preview {
+    NavigationStack {
+        CourseDetailView(course: previewCourse)
+    }
+    .modelContainer(for: [
+        Course.self,
+        LectureNote.self,
+        Flashcard.self,
+        QuizQuestion.self
+    ], inMemory: true)
+}
+
+private var previewCourse: Course {
+    let course = Course(title: "Machine Learning")
+
+    let note1 = LectureNote(
+        title: "Lecture 5 - Neural Networks",
+        markdown: """
+        # Neural Networks
+
+        ## Summary
+        - Introduced perceptrons
+        - Explained backpropagation
+        """
+    )
+
+    let note2 = LectureNote(
+        title: "Lecture 6 - Overfitting",
+        markdown: """
+        # Overfitting
+
+        ## Summary
+        - Training loss can be misleading
+        - Validation data is important
+        """
+    )
+
+    course.notes = [note1, note2]
+    return course
 }
