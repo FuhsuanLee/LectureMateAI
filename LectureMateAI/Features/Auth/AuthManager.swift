@@ -26,6 +26,20 @@ class AuthManager: ObservableObject {
         self.username = UserDefaults.standard.string(forKey: "username") ?? ""
     }
 
+    // Reader-friendly name derived from the signed-in email, shared by every
+    // view that shows the user's identity.
+    var displayName: String {
+        let rawValue = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rawValue.isEmpty else { return "Student" }
+
+        let candidate = rawValue.split(separator: "@").first.map(String.init) ?? rawValue
+        return candidate
+            .replacingOccurrences(of: ".", with: " ")
+            .split(separator: " ")
+            .map { $0.capitalized }
+            .joined(separator: " ")
+    }
+
     func login(email: String, password: String) {
         username = email
         isLoggedIn = true

@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import UIKit
 
 private enum MainTab: Hashable {
     case dashboard
@@ -17,18 +16,6 @@ private enum MainTab: Hashable {
 
 struct MainTabView: View {
     @State private var selectedTab: MainTab = .dashboard
-
-    init() {
-        let appearance = UITabBarAppearance()
-        appearance.configureWithTransparentBackground()
-        appearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterialLight)
-        appearance.backgroundColor = UIColor.white.withAlphaComponent(0.92)
-        appearance.shadowColor = UIColor.black.withAlphaComponent(0.04)
-
-        UITabBar.appearance().standardAppearance = appearance
-        UITabBar.appearance().scrollEdgeAppearance = appearance
-        UITabBar.appearance().unselectedItemTintColor = UIColor(AppTheme.secondaryText)
-    }
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -58,6 +45,5 @@ struct MainTabView: View {
                 }
                 .tag(MainTab.settings)
         }
-        .tint(AppTheme.blue)
     }
 }

@@ -23,55 +23,44 @@ struct GenerateNoteView: View {
     private let tip = GenerateNoteTip()
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+        Form {
+            Section {
                 TipView(tip)
+            }
 
+            Section("Lecture Title") {
                 TextField("Lecture title", text: $lectureTitle)
-                    .textFieldStyle(.roundedBorder)
+            }
 
-                VStack(alignment: .leading) {
-                    Text("Lecture Transcript")
-                        .font(.headline)
+            Section("Lecture Transcript") {
+                TextEditor(text: $transcript)
+                    .frame(minHeight: 160)
+            }
 
-                    TextEditor(text: $transcript)
-                        .frame(height: 180)
-                        .padding(8)
-                        .background(.thinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
+            Section("Slide Content") {
+                TextEditor(text: $slideText)
+                    .frame(minHeight: 120)
+            }
 
-                VStack(alignment: .leading) {
-                    Text("Slide Content")
-                        .font(.headline)
-
-                    TextEditor(text: $slideText)
-                        .frame(height: 140)
-                        .padding(8)
-                        .background(.thinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-
+            Section {
                 Button {
                     generateNote()
                 } label: {
-                    HStack {
+                    HStack(spacing: 8) {
                         if isGenerating {
                             ProgressView()
                         }
 
-                        Text(isGenerating ? "Generating..." : "Generate AI Note")
-                            .fontWeight(.semibold)
+                        Text(isGenerating ? "Generating…" : "Generate AI Note")
                     }
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(.blue)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
                 .disabled(lectureTitle.isEmpty || transcript.isEmpty || isGenerating)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
             }
-            .padding()
         }
         .navigationTitle("AI Generate")
     }

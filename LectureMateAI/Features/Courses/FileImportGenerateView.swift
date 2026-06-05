@@ -121,7 +121,7 @@ private enum GenerationStage: Equatable {
         case .idle:
             return .secondary
         case .preparing, .extractingPDF, .transcribingAudio, .generatingMarkdown, .savingNote:
-            return .blue
+            return .accentColor
         }
     }
 
@@ -240,7 +240,7 @@ private enum ProcessingStepState {
         case .pending:
             return .secondary
         case .active:
-            return .blue
+            return .accentColor
         case .complete:
             return .green
         }
@@ -261,9 +261,6 @@ struct FileImportGenerateView: View {
     @State private var selectedPDFURL: URL?
     @State private var selectedPDFFilename = ""
 
-    @State private var transcript = ""
-    @State private var pdfText = ""
-
     @State private var showFileImporter = false
     @State private var importType: ImportType?
     @FocusState private var isLectureTitleFocused: Bool
@@ -276,100 +273,94 @@ struct FileImportGenerateView: View {
         lectureTitle.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var isBusy: Bool {
-        isGeneratingNote
-    }
-
     private var canGenerateNote: Bool {
         !trimmedLectureTitle.isEmpty &&
         selectedAudioURL != nil &&
         selectedPDFURL != nil &&
-        !isBusy
+        !isGeneratingNote
     }
 
     var body: some View {
-        AppBackground {
-            AppScrollPage(bottomPadding: 44) {
-                VStack(alignment: .leading, spacing: 22) {
-                    lectureTitleSection
-                    uploadSectionCard(
-                        title: "Upload Lecture Audio or Video",
-                        subtitle: "We'll transcribe your lecture automatically when you generate the note.",
-                        token: AppPalette.noteTokens[0],
-                        buttonTitle: "Upload MP3 / MP4 / M4A",
-                        emptyStateText: "No audio or video file selected yet",
-                        filename: selectedAudioFilename,
-                        metadata: audioMetadataText,
-                        onUpload: { presentImporter(for: .audio) },
-                        onClear: clearAudioSelection
-                    )
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                lectureTitleSection
+                uploadSectionCard(
+                    title: "Upload Lecture Audio or Video",
+                    subtitle: "We'll transcribe your lecture automatically when you generate the note.",
+                    token: AppPalette.noteTokens[0],
+                    buttonTitle: "Upload MP3 / MP4 / M4A",
+                    emptyStateText: "No audio or video file selected yet",
+                    filename: selectedAudioFilename,
+                    metadata: audioMetadataText,
+                    onUpload: { presentImporter(for: .audio) },
+                    onClear: clearAudioSelection
+                )
 
-                    uploadSectionCard(
-                        title: "Upload PDF Slides",
-                        subtitle: "PDFKit will extract slide text so the AI can build better notes.",
-                        token: AppPalette.noteTokens[1],
-                        buttonTitle: "Upload PDF",
-                        emptyStateText: "No PDF file selected yet",
-                        filename: selectedPDFFilename,
-                        metadata: pdfMetadataText,
-                        onUpload: { presentImporter(for: .pdf) },
-                        onClear: clearPDFSelection
-                    )
+                uploadSectionCard(
+                    title: "Upload PDF Slides",
+                    subtitle: "PDFKit will extract slide text so the AI can build better notes.",
+                    token: AppPalette.noteTokens[1],
+                    buttonTitle: "Upload PDF",
+                    emptyStateText: "No PDF file selected yet",
+                    filename: selectedPDFFilename,
+                    metadata: pdfMetadataText,
+                    onUpload: { presentImporter(for: .pdf) },
+                    onClear: clearPDFSelection
+                )
 
-                    if isBusy || generationStage == .completed || canGenerateNote {
-                        generationStatusCard()
-                    }
+                if isGeneratingNote || generationStage == .completed || canGenerateNote {
+                    generationStatusCard()
+                }
 
+                VStack(spacing: 8) {
                     Button {
                         generateMarkdownNote()
                     } label: {
-                        HStack(spacing: 12) {
+                        HStack(spacing: 8) {
                             if isGeneratingNote {
                                 ProgressView()
-                                    .tint(.white)
-                            } else {
-                                Image(systemName: "sparkles")
-                            }
-
-                            VStack(spacing: 4) {
                                 Text(generateButtonTitle)
-
-                                if !isGeneratingNote {
-                                    Text("AI will create a structured markdown note from your lecture")
-                                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                                        .foregroundStyle(.white.opacity(0.85))
-                                }
+                            } else {
+                                Label(generateButtonTitle, systemImage: "sparkles")
                             }
                         }
+                        .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(AppPrimaryButtonStyle())
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
                     .disabled(!canGenerateNote)
-                    .opacity(canGenerateNote ? 1.0 : 0.76)
 
-                    if !errorMessage.isEmpty {
-                        errorCard()
-                    }
-
-                    HStack(spacing: 10) {
-                        Image(systemName: "lock")
-                            .foregroundStyle(AppTheme.secondaryText)
-
-                        Text("Your files stay on-device except for OpenAI processing needed to transcribe and generate notes.")
-                            .font(.system(size: 14, weight: .medium, design: .rounded))
-                            .foregroundStyle(AppTheme.secondaryText)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
+                    Text("AI will create a structured markdown note from your lecture")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    dismissKeyboard()
+
+                if !errorMessage.isEmpty {
+                    errorCard()
                 }
+
+                Label(
+                    "Your files stay on-device except for OpenAI processing needed to transcribe and generate notes.",
+                    systemImage: "lock"
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                dismissKeyboard()
             }
         }
+        .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Import Lecture")
-        .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
         .animation(.easeInOut(duration: 0.2), value: isGeneratingNote)
         .animation(.easeInOut(duration: 0.2), value: generationStage)
@@ -400,21 +391,16 @@ struct FileImportGenerateView: View {
     private var lectureTitleSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Lecture Title")
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
-                .foregroundStyle(AppTheme.secondaryText)
+                .font(.title3.weight(.semibold))
 
-            HStack {
-                TextField("Machine Learning Basics - Lecture 12", text: $lectureTitle)
-                    .font(.system(size: 21, weight: .medium, design: .rounded))
-                    .foregroundStyle(AppTheme.ink)
-                    .focused($isLectureTitleFocused)
-
-                Text("\(trimmedLectureTitle.count)/100")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundStyle(AppTheme.secondaryText)
-            }
-            .appInputField()
-            .appCard(cornerRadius: 28)
+            TextField("Machine Learning Basics - Lecture 12", text: $lectureTitle)
+                .font(.body)
+                .focused($isLectureTitleFocused)
+                .padding(14)
+                .background(
+                    Color(uiColor: .secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
         }
     }
 
@@ -444,10 +430,9 @@ struct FileImportGenerateView: View {
             guard let sourceURL = try result.get().first else { return }
 
             let localURL = try copyImportedFileToTemporaryDirectory(from: sourceURL)
+            removeImportedFile(at: selectedAudioURL)
             selectedAudioURL = localURL
             selectedAudioFilename = sourceURL.lastPathComponent
-            transcript = ""
-
             errorMessage = ""
         } catch {
             errorMessage = "Failed to import audio file: \(userFacingMessage(for: error))"
@@ -459,10 +444,9 @@ struct FileImportGenerateView: View {
             guard let sourceURL = try result.get().first else { return }
 
             let localURL = try copyImportedFileToTemporaryDirectory(from: sourceURL)
-
+            removeImportedFile(at: selectedPDFURL)
             selectedPDFURL = localURL
             selectedPDFFilename = sourceURL.lastPathComponent
-            pdfText = ""
             errorMessage = ""
         } catch {
             errorMessage = "Failed to import PDF file: \(userFacingMessage(for: error))"
@@ -489,21 +473,28 @@ struct FileImportGenerateView: View {
     }
 
     private func clearAudioSelection() {
+        removeImportedFile(at: selectedAudioURL)
         selectedAudioURL = nil
         selectedAudioFilename = ""
-        transcript = ""
         if !isGeneratingNote {
             generationStage = .idle
         }
     }
 
     private func clearPDFSelection() {
+        removeImportedFile(at: selectedPDFURL)
         selectedPDFURL = nil
         selectedPDFFilename = ""
-        pdfText = ""
         if !isGeneratingNote {
             generationStage = .idle
         }
+    }
+
+    // Imported files are private temporary copies; delete the previous copy
+    // whenever a selection is cleared or replaced so they don't pile up.
+    private func removeImportedFile(at url: URL?) {
+        guard let url else { return }
+        try? FileManager.default.removeItem(at: url)
     }
 
     private func readableFileSize(for url: URL) -> String? {
@@ -596,14 +587,12 @@ struct FileImportGenerateView: View {
                 let extractedPDFText = try extractPDFText(from: selectedPDFURL)
 
                 await MainActor.run {
-                    pdfText = extractedPDFText
                     generationStage = .transcribingAudio
                 }
 
                 let transcribedText = try await openAIService.transcribeAudio(fileURL: selectedAudioURL)
 
                 await MainActor.run {
-                    transcript = transcribedText
                     generationStage = .generatingMarkdown
                 }
 
@@ -651,55 +640,18 @@ struct FileImportGenerateView: View {
         }
     }
 
-    private func importChecklistCard() -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Label("Import Checklist", systemImage: "checklist")
-                .font(.headline)
-
-            checklistRow(
-                title: "Lecture title",
-                detail: trimmedLectureTitle.isEmpty ? "Enter a title for this lecture" : trimmedLectureTitle,
-                isComplete: !trimmedLectureTitle.isEmpty
-            )
-
-            checklistRow(
-                title: "Audio or video",
-                detail: selectedAudioFilename.isEmpty ? "Upload one MP3, MP4, or M4A file" : selectedAudioFilename,
-                isComplete: selectedAudioURL != nil
-            )
-
-            checklistRow(
-                title: "PDF slides",
-                detail: selectedPDFFilename.isEmpty ? "Upload the lecture PDF slides" : selectedPDFFilename,
-                isComplete: selectedPDFURL != nil
-            )
-        }
-        .padding(16)
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-    }
-
     private func generationStatusCard() -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(generationStage.tint.opacity(0.14))
-                        .frame(width: 54, height: 54)
+                AppIconBadge(icon: generationStage.systemImage, tint: generationStage.tint, size: 36)
 
-                    Image(systemName: generationStage.systemImage)
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(generationStage.tint)
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(statusCardTitle)
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppTheme.ink)
+                        .font(.headline)
 
                     Text(statusCardDetail)
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
-                        .foregroundStyle(AppTheme.secondaryText)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -717,14 +669,9 @@ struct FileImportGenerateView: View {
                 .padding(.top, 4)
             }
         }
-        .padding(20)
-        .background(backgroundColor(for: generationStage))
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .stroke(Color.white.opacity(0.8), lineWidth: 1)
-        )
-        .shadow(color: AppTheme.softShadow, radius: 18, x: 0, y: 10)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardBackground()
     }
 
     private var statusCardTitle: String {
@@ -746,22 +693,24 @@ struct FileImportGenerateView: View {
     private func errorCard() -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Something went wrong", systemImage: "exclamationmark.triangle.fill")
-                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .font(.headline)
                 .foregroundStyle(.red)
 
             Text(errorMessage)
-                .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundStyle(.primary)
+                .font(.subheadline)
 
             if let suggestion = recoverySuggestion {
                 Text(suggestion)
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundStyle(AppTheme.secondaryText)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
         }
-        .padding(20)
-        .background(AppTheme.red.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Color.red.opacity(0.12),
+            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+        )
     }
 
     private var recoverySuggestion: String? {
@@ -798,51 +747,49 @@ struct FileImportGenerateView: View {
         onClear: @escaping () -> Void
     ) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 14) {
-                AppIconTile(token: token, size: 58)
+            HStack(spacing: 12) {
+                AppIconBadge(token: token, size: 36)
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppTheme.ink)
+                        .font(.headline)
 
                     Text(subtitle)
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
-                        .foregroundStyle(AppTheme.secondaryText)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
 
             Button(action: onUpload) {
-                VStack(spacing: 10) {
+                VStack(spacing: 8) {
                     Image(systemName: "icloud.and.arrow.up")
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(token.gradient)
+                        .font(.title2)
+                        .foregroundStyle(token.tint)
 
                     Text(buttonTitle)
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(token.tint)
 
                     Text("Tap to choose your file")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(AppTheme.secondaryText)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
+                .padding(.vertical, 20)
                 .background(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(token.softTint.opacity(0.35))
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(token.tint.opacity(0.08))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .stroke(token.tint.opacity(0.35), style: StrokeStyle(lineWidth: 1.5, dash: [8, 6]))
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(token.tint.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
                 )
             }
             .buttonStyle(.plain)
-            .disabled(isBusy)
+            .disabled(isGeneratingNote)
 
             if !filename.isEmpty {
                 selectedFileRow(
-                    title: title,
                     filename: filename,
                     metadata: metadata,
                     token: token,
@@ -852,86 +799,58 @@ struct FileImportGenerateView: View {
                 hintText(emptyStateText)
             }
         }
-        .padding(22)
-        .appCard(cornerRadius: 30)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardBackground()
     }
 
     @ViewBuilder
     private func selectedFileRow(
-        title: String,
         filename: String,
         metadata: String,
         token: AppVisualToken,
         onClear: @escaping () -> Void
     ) -> some View {
-        HStack(spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(token.softTint)
-                    .frame(width: 52, height: 52)
+        HStack(spacing: 12) {
+            AppIconBadge(token: token, size: 36)
 
-                Image(systemName: token.icon)
-                    .foregroundStyle(token.gradient)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(filename)
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundStyle(AppTheme.ink)
+                    .font(.subheadline.weight(.semibold))
                     .lineLimit(2)
 
                 Text(metadata)
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundStyle(AppTheme.secondaryText)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            VStack(spacing: 12) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(.green)
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+                .accessibilityHidden(true)
 
-                Button(action: onClear) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(AppTheme.secondaryText)
-                        .frame(width: 24, height: 24)
-                        .background(Circle().fill(Color.white.opacity(0.82)))
-                }
-                .buttonStyle(.plain)
-                .disabled(isBusy)
+            Button(action: onClear) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .disabled(isGeneratingNote)
+            .accessibilityLabel("Remove file")
         }
-        .padding(14)
-        .background(Color.white.opacity(0.66))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(12)
+        .background(
+            Color(uiColor: .tertiarySystemFill),
+            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+        )
     }
 
     private func hintText(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 14, weight: .medium, design: .rounded))
-            .foregroundStyle(AppTheme.secondaryText)
-    }
-
-    private func checklistRow(title: String, detail: String, isComplete: Bool) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: isComplete ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(isComplete ? .green : .secondary)
-                .padding(.top, 2)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-
-            Spacer()
-        }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
     }
 
     private func processingStepRow(step: ProcessingStep, state: ProcessingStepState) -> some View {
@@ -940,14 +859,13 @@ struct FileImportGenerateView: View {
                 .foregroundStyle(state.tint)
                 .padding(.top, 2)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(step.title)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(AppTheme.ink)
+                    .font(.subheadline.weight(.semibold))
 
                 Text(step.subtitle)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(AppTheme.secondaryText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()
@@ -964,17 +882,6 @@ struct FileImportGenerateView: View {
         }
 
         return .pending
-    }
-
-    private func backgroundColor(for stage: GenerationStage) -> Color {
-        switch stage {
-        case .completed:
-            return .green.opacity(0.10)
-        case .idle:
-            return AppTheme.blue.opacity(0.08)
-        case .preparing, .extractingPDF, .transcribingAudio, .generatingMarkdown, .savingNote:
-            return AppTheme.blue.opacity(0.10)
-        }
     }
 
     private func userFacingMessage(for error: Error) -> String {

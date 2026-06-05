@@ -6,12 +6,29 @@
 //
 
 import SwiftUI
+import SwiftData
+
+// Value snapshot of a flashcard so the review deck never holds live SwiftData
+// model references — deleting the source course or note elsewhere in the app
+// cannot invalidate what this screen is showing.
+private struct ReviewFlashcard: Identifiable {
+    let id = UUID()
+    let term: String
+    let definitionText: String
+    let example: String
+
+    init(_ flashcard: Flashcard) {
+        self.term = flashcard.term
+        self.definitionText = flashcard.definitionText
+        self.example = flashcard.example
+    }
+}
 
 struct FlashcardReviewView: View {
     let flashcards: [Flashcard]
     let deckTitle: String
 
-    @State private var orderedFlashcards: [Flashcard] = []
+    @State private var orderedFlashcards: [ReviewFlashcard] = []
     @State private var currentIndex = 0
     @State private var isFlipped = false
 
@@ -20,7 +37,7 @@ struct FlashcardReviewView: View {
         self.deckTitle = deckTitle
     }
 
-    private var currentFlashcard: Flashcard? {
+    private var currentFlashcard: ReviewFlashcard? {
         guard orderedFlashcards.indices.contains(currentIndex) else { return nil }
         return orderedFlashcards[currentIndex]
     }
@@ -40,72 +57,60 @@ struct FlashcardReviewView: View {
     }
 
     var body: some View {
-        AppBackground {
-            VStack(spacing: 24) {
-                if orderedFlashcards.isEmpty {
-                    VStack(spacing: 16) {
-                        Text("No Flashcards")
-                            .font(.system(size: 30, weight: .bold, design: .rounded))
-                            .foregroundStyle(AppTheme.ink)
-
-                        Text("Generate notes first to create flashcards.")
-                            .font(.system(size: 16, weight: .medium, design: .rounded))
-                            .foregroundStyle(AppTheme.secondaryText)
-                    }
-                    .padding(24)
-                    .appCard(cornerRadius: 30)
-                } else {
+        Group {
+            if orderedFlashcards.isEmpty {
+                ContentUnavailableView(
+                    "No Flashcards",
+                    systemImage: "rectangle.on.rectangle",
+                    description: Text("Generate notes first to create flashcards.")
+                )
+            } else {
+                VStack(spacing: 24) {
                     progressSection
-                    flashcardStack
+                    flashcardSection
                     controlsSection
                     statsSection
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 20)
-            .padding(.bottom, 36)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
+        .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
         .navigationTitle(deckTitle)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    shuffleDeck()
+                } label: {
+                    Image(systemName: "shuffle")
+                }
+                .accessibilityLabel("Shuffle deck")
+                .disabled(orderedFlashcards.isEmpty)
+            }
+        }
         .onAppear {
             if orderedFlashcards.isEmpty {
-                orderedFlashcards = flashcards
+                orderedFlashcards = flashcards.map { ReviewFlashcard($0) }
             }
         }
     }
 
     private var progressSection: some View {
-        VStack(spacing: 14) {
-            HStack {
-                ProgressView(value: progress)
-                    .tint(AppTheme.blue)
+        HStack(spacing: 12) {
+            ProgressView(value: progress)
 
-                Text("\(currentIndex + 1) / \(orderedFlashcards.count)")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(AppTheme.secondaryText)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Color.white.opacity(0.7))
-                    .clipShape(Capsule())
-            }
+            Text("\(currentIndex + 1) of \(orderedFlashcards.count)")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
         }
     }
 
-    private var flashcardStack: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 34, style: .continuous)
-                .fill(AppTheme.purple.opacity(0.07))
-                .frame(maxWidth: .infinity, maxHeight: 520)
-                .rotationEffect(.degrees(-4))
-                .offset(x: -10, y: 10)
-
-            RoundedRectangle(cornerRadius: 34, style: .continuous)
-                .fill(AppTheme.blue.opacity(0.07))
-                .frame(maxWidth: .infinity, maxHeight: 520)
-                .rotationEffect(.degrees(3))
-                .offset(x: 8, y: -4)
-
+    private var flashcardSection: some View {
+        Group {
             if let currentFlashcard {
                 FlashcardFaceView(
                     flashcard: currentFlashcard,
@@ -114,99 +119,48 @@ struct FlashcardReviewView: View {
                 .onTapGesture {
                     flipCard()
                 }
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint("Double tap to flip the card.")
             }
         }
     }
 
     private var controlsSection: some View {
-        HStack(spacing: 22) {
+        HStack(spacing: 16) {
             Button {
                 movePrevious()
             } label: {
-                VStack(spacing: 10) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 24, weight: .bold))
-                    Text("Previous")
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
-                }
-                .foregroundStyle(AppTheme.blue)
-                .frame(width: 110, height: 110)
-                .background(Color.white.opacity(0.86))
-                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                Image(systemName: "chevron.left")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.bordered)
+            .accessibilityLabel("Previous card")
             .disabled(currentIndex == 0)
-            .opacity(currentIndex == 0 ? 0.45 : 1.0)
 
             Button {
                 flipCard()
             } label: {
-                VStack(spacing: 10) {
-                    Image(systemName: "arrow.2.squarepath")
-                        .font(.system(size: 28, weight: .bold))
-                    Text("Flip")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                }
-                .foregroundStyle(.white)
-                .frame(width: 124, height: 124)
-                .background(Circle().fill(AppTheme.primaryGradient))
-                .shadow(color: AppTheme.blue.opacity(0.22), radius: 18, x: 0, y: 12)
+                Label("Flip", systemImage: "arrow.2.squarepath")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.borderedProminent)
 
             Button {
                 moveNext()
             } label: {
-                VStack(spacing: 10) {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 24, weight: .bold))
-                    Text("Next")
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
-                }
-                .foregroundStyle(AppTheme.blue)
-                .frame(width: 110, height: 110)
-                .background(Color.white.opacity(0.86))
-                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                Image(systemName: "chevron.right")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.bordered)
+            .accessibilityLabel("Next card")
             .disabled(currentIndex == orderedFlashcards.count - 1)
-            .opacity(currentIndex == orderedFlashcards.count - 1 ? 0.45 : 1.0)
         }
+        .controlSize(.large)
     }
 
     private var statsSection: some View {
-        HStack(spacing: 14) {
-            FlashcardStatPill(
-                title: "Reviewed",
-                value: "\(reviewedCount)",
-                color: AppTheme.mint
-            )
-
-            FlashcardStatPill(
-                title: "Remaining",
-                value: "\(remainingCount)",
-                color: AppTheme.orange
-            )
-
-            Button {
-                shuffleDeck()
-            } label: {
-                VStack(spacing: 6) {
-                    Text("Shuffle")
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .foregroundStyle(AppTheme.purple)
-
-                    Image(systemName: "shuffle")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(AppTheme.purple)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(AppTheme.purple.opacity(0.10))
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            }
-            .buttonStyle(.plain)
-        }
+        Text("\(reviewedCount) reviewed • \(remainingCount) remaining")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .monospacedDigit()
+            .frame(maxWidth: .infinity)
     }
 
     private func flipCard() {
@@ -236,18 +190,14 @@ struct FlashcardReviewView: View {
 }
 
 private struct FlashcardFaceView: View {
-    let flashcard: Flashcard
+    let flashcard: ReviewFlashcard
     let isFlipped: Bool
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 34, style: .continuous)
-                .fill(Color.white.opacity(0.92))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 34, style: .continuous)
-                        .stroke(Color.white.opacity(0.86), lineWidth: 1)
-                )
-                .shadow(color: AppTheme.softShadow, radius: 24, x: 0, y: 14)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color(uiColor: .secondarySystemGroupedBackground))
+                .shadow(color: .black.opacity(0.08), radius: 8, y: 2)
 
             frontView
                 .opacity(isFlipped ? 0 : 1)
@@ -256,7 +206,7 @@ private struct FlashcardFaceView: View {
                 .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
                 .opacity(isFlipped ? 1 : 0)
         }
-        .frame(maxWidth: .infinity, maxHeight: 520)
+        .frame(maxWidth: .infinity, minHeight: 320, maxHeight: 460)
         .rotation3DEffect(
             .degrees(isFlipped ? 180 : 0),
             axis: (x: 0, y: 1, z: 0)
@@ -265,94 +215,99 @@ private struct FlashcardFaceView: View {
     }
 
     private var frontView: some View {
-        VStack(spacing: 22) {
+        VStack(spacing: 16) {
             HStack {
-                AppIconTile(token: AppPalette.noteTokens[4], size: 58)
+                FlashcardFaceTag(text: "Term")
                 Spacer()
-                Image(systemName: "bookmark")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(AppTheme.purple)
             }
 
             Spacer()
 
             Text(flashcard.term)
-                .font(.system(size: 42, weight: .bold, design: .rounded))
-                .foregroundStyle(AppTheme.ink)
+                .font(.title.weight(.bold))
                 .multilineTextAlignment(.center)
-
-            RoundedRectangle(cornerRadius: 999, style: .continuous)
-                .fill(AppTheme.coolGradient)
-                .frame(width: 110, height: 5)
-
-            Text("Tap to flip")
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
-                .foregroundStyle(AppTheme.secondaryText)
 
             Spacer()
 
-            Label("Tap card to reveal the definition", systemImage: "hand.tap")
-                .font(.system(size: 18, weight: .medium, design: .rounded))
-                .foregroundStyle(AppTheme.blue)
+            Text("Tap to flip")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
-        .padding(28)
+        .padding(20)
     }
 
     private var backView: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                AppPill(text: "Definition", color: AppTheme.blue)
-                Spacer()
-            }
+        VStack(alignment: .leading, spacing: 16) {
+            FlashcardFaceTag(text: "Definition")
 
-            Text(flashcard.definitionText)
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .foregroundStyle(AppTheme.ink)
+            // Definitions are unbounded AI output, so the body scrolls
+            // rather than truncating inside the card's height cap.
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text(flashcard.definitionText)
+                        .font(.title3.weight(.semibold))
 
-            if !flashcard.example.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Example")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppTheme.mint)
+                    if !flashcard.example.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Example")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
 
-                    Text(flashcard.example)
-                        .font(.system(size: 18, weight: .medium, design: .rounded))
-                        .foregroundStyle(AppTheme.secondaryText)
+                            Text(flashcard.example)
+                                .font(.callout)
+                        }
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            Color(uiColor: .tertiarySystemFill),
+                            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        )
+                    }
                 }
-                .padding(18)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(AppTheme.mint.opacity(0.10))
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             }
-
-            Spacer()
-
-            Text("Tap the card again to go back")
-                .font(.system(size: 16, weight: .semibold, design: .rounded))
-                .foregroundStyle(AppTheme.purple)
         }
-        .padding(28)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(20)
     }
 }
 
-private struct FlashcardStatPill: View {
-    let title: String
-    let value: String
-    let color: Color
+// Small capsule tag identifying which face of the card is showing.
+private struct FlashcardFaceTag: View {
+    let text: String
 
     var body: some View {
-        VStack(spacing: 6) {
-            Text(value)
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .foregroundStyle(color)
-
-            Text(title)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundStyle(AppTheme.secondaryText)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .background(color.opacity(0.10))
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        Text(text)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(AppTheme.flashcards)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(AppTheme.flashcards.opacity(0.15), in: Capsule())
     }
+}
+
+#Preview {
+    NavigationStack {
+        FlashcardReviewView(
+            flashcards: [
+                Flashcard(
+                    term: "NavigationStack",
+                    definitionText: "A container that manages a navigation path in SwiftUI.",
+                    example: "Push CourseDetailView from CourseListView."
+                ),
+                Flashcard(
+                    term: "TabView",
+                    definitionText: "A container that switches between multiple top-level pages.",
+                    example: "Dashboard, Courses, Flashcards, Settings."
+                )
+            ],
+            deckTitle: "SwiftUI Basics"
+        )
+    }
+    .modelContainer(for: [
+        Course.self,
+        LectureNote.self,
+        Flashcard.self,
+        QuizQuestion.self
+    ], inMemory: true)
 }

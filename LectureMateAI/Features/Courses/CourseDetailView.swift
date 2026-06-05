@@ -21,12 +21,34 @@ struct CourseDetailView: View {
     }
 
     var body: some View {
-        AppBackground {
-            AppScrollPage(bottomPadding: 44) {
-                VStack(alignment: .leading, spacing: 22) {
-                    summaryCard
-                    notesHeader
-                    notesSection
+        List {
+            Section {
+                summaryRow
+
+                NavigationLink {
+                    FileImportGenerateView(course: course)
+                } label: {
+                    Label("New Lecture Note", systemImage: "plus")
+                        .foregroundStyle(.tint)
+                }
+            }
+
+            Section("Lecture Notes") {
+                if sortedNotes.isEmpty {
+                    ContentUnavailableView(
+                        "No Lecture Notes",
+                        systemImage: "doc.text",
+                        description: Text("Tap “New Lecture Note” to upload lecture audio and slides for this course.")
+                    )
+                    .listRowBackground(Color.clear)
+                } else {
+                    ForEach(sortedNotes) { note in
+                        NavigationLink {
+                            NoteDetailView(note: note)
+                        } label: {
+                            CourseNoteRow(note: note)
+                        }
+                    }
                 }
             }
         }
@@ -38,133 +60,60 @@ struct CourseDetailView: View {
                     FileImportGenerateView(course: course)
                 } label: {
                     Image(systemName: "sparkles")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 40, height: 40)
-                        .background(Circle().fill(AppTheme.primaryGradient))
                 }
+                .accessibilityLabel("New Lecture Note")
             }
         }
     }
 
-    private var summaryCard: some View {
-        let token = AppPalette.courseToken(for: course.title)
+    private var summaryRow: some View {
+        HStack(spacing: 12) {
+            AppIconBadge(token: AppPalette.courseToken(for: course.title), size: 44)
 
-        return VStack(alignment: .leading, spacing: 20) {
-            HStack(alignment: .center, spacing: 16) {
-                AppIconTile(token: token, size: 78)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(course.title)
+                    .font(.headline)
+                    .lineLimit(2)
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(course.title)
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppTheme.ink)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.8)
-
-                    HStack(spacing: 8) {
-                        AppPill(text: "\(course.notes.count) notes", color: AppTheme.blue)
-                        AppPill(text: "Updated \(latestDateText)", color: AppTheme.secondaryText)
-                    }
-                }
-            }
-
-            NavigationLink {
-                FileImportGenerateView(course: course)
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "sparkles")
-                    Text("New Lecture Note")
-                }
-            }
-            .buttonStyle(AppPrimaryButtonStyle())
-        }
-        .padding(20)
-        .appCard(cornerRadius: 32)
-    }
-
-    private var notesHeader: some View {
-        HStack {
-            Label("Lecture Notes", systemImage: "doc.text")
-                .font(.system(size: 24, weight: .bold, design: .rounded))
-                .foregroundStyle(AppTheme.ink)
-
-            Spacer()
-
-            Text("Newest First")
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(AppTheme.secondaryText)
-        }
-    }
-
-    private var notesSection: some View {
-        LazyVStack(spacing: 16) {
-            if sortedNotes.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("No lecture notes yet")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppTheme.ink)
-
-                    Text("Tap “New Lecture Note” to upload lecture audio and slides for this course.")
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
-                        .foregroundStyle(AppTheme.secondaryText)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(20)
-                .appCard()
-            } else {
-                ForEach(sortedNotes) { note in
-                    NavigationLink {
-                        NoteDetailView(note: note)
-                    } label: {
-                        CourseNoteCard(note: note)
-                    }
-                    .buttonStyle(.plain)
-                }
+                Text("\(course.notes.count) note\(course.notes.count == 1 ? "" : "s") • Updated \(latestDateText)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
         }
     }
 }
 
-private struct CourseNoteCard: View {
+private struct CourseNoteRow: View {
     let note: LectureNote
 
+    private var subtitle: String {
+        var parts = [note.createdAt.formatted(date: .abbreviated, time: .omitted)]
+
+        if !note.flashcards.isEmpty {
+            parts.append("\(note.flashcards.count) flashcard\(note.flashcards.count == 1 ? "" : "s")")
+        }
+
+        if !note.quizQuestions.isEmpty {
+            parts.append("\(note.quizQuestions.count) quiz question\(note.quizQuestions.count == 1 ? "" : "s")")
+        }
+
+        return parts.joined(separator: " • ")
+    }
+
     var body: some View {
-        let token = AppPalette.noteToken(for: note.title)
+        HStack(spacing: 12) {
+            AppIconBadge(token: AppPalette.noteToken(for: note.title), size: 36)
 
-        HStack(spacing: 16) {
-            AppIconTile(token: token, size: 70)
-
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(note.title)
-                    .font(.system(size: 23, weight: .bold, design: .rounded))
-                    .foregroundStyle(AppTheme.ink)
+                    .font(.headline)
                     .lineLimit(2)
 
-                Text(note.createdAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundStyle(AppTheme.secondaryText)
-
-                HStack(spacing: 8) {
-                    AppPill(text: "AI Notes", color: AppTheme.blue)
-
-                    if !note.flashcards.isEmpty {
-                        AppPill(text: "Flashcards \(note.flashcards.count)", color: AppTheme.purple)
-                    }
-
-                    if !note.quizQuestions.isEmpty {
-                        AppPill(text: "Quiz \(note.quizQuestions.count)", color: AppTheme.orange)
-                    }
-                }
+                Text(subtitle)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(AppTheme.secondaryText)
         }
-        .padding(18)
-        .appCard()
     }
 }
 

@@ -57,85 +57,43 @@ struct DashboardView: View {
         return min((notesProgress + flashcardProgress + accuracy) / 3.0, 1)
     }
 
-    private var displayName: String {
-        let rawValue = authManager.username.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !rawValue.isEmpty else { return "Student" }
-
-        let candidate = rawValue.split(separator: "@").first.map(String.init) ?? rawValue
-        return candidate
-            .replacingOccurrences(of: ".", with: " ")
-            .split(separator: " ")
-            .map { $0.capitalized }
-            .joined(separator: " ")
-    }
-
     private var firstName: String {
-        displayName.split(separator: " ").first.map(String.init) ?? displayName
+        let displayName = authManager.displayName
+        return displayName.split(separator: " ").first.map(String.init) ?? displayName
     }
 
     var body: some View {
         NavigationStack {
-            AppBackground {
-                AppScrollPage {
-                    VStack(alignment: .leading, spacing: 24) {
-                        headerSection
-                        heroSection
-                        statsSection
-                        recentNotesSection
-                        progressSection
-                    }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    greetingSection
+                    statsSection
+                    recentNotesSection
+                    progressSection
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 24)
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .background(Color(uiColor: .systemGroupedBackground))
+            .navigationTitle("Dashboard")
         }
     }
 
-    private var headerSection: some View {
-        HStack(alignment: .center, spacing: 16) {
-            HStack(spacing: 14) {
-                LectureMateLogoMark(size: 58)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("LectureMate AI")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppTheme.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-
-                    Text("Your AI Study Partner")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(AppTheme.secondaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                }
-            }
-
-            Spacer()
-
-            AppAvatarBadge(name: displayName, size: 56)
-        }
-    }
-
-    private var heroSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Hi \(firstName) 👋")
-                .font(.system(size: 36, weight: .bold, design: .rounded))
-                .foregroundStyle(AppTheme.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
+    private var greetingSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Hi \(firstName)")
+                .font(.title2.weight(.bold))
 
             Text("Ready to turn lectures into knowledge?")
-                .font(.system(size: 18, weight: .medium, design: .rounded))
-                .foregroundStyle(AppTheme.secondaryText)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
 
             Button(action: onCreateNote) {
-                HStack(spacing: 10) {
-                    Image(systemName: "sparkles")
-                    Text("New Note")
-                }
+                Label("New Note", systemImage: "plus")
             }
-            .buttonStyle(AppPrimaryButtonStyle())
-            .frame(maxWidth: 230)
+            .buttonStyle(.borderedProminent)
+            .padding(.top, 4)
         }
     }
 
@@ -150,60 +108,41 @@ struct DashboardView: View {
             DashboardStatCard(
                 title: "Total Courses",
                 value: "\(courses.count)",
-                footnote: "Courses in your semester",
-                token: AppPalette.courseTokens[5]
+                token: AppPalette.courseTokens[0]
             )
 
             DashboardStatCard(
                 title: "Total Notes",
                 value: "\(totalNotes)",
-                footnote: "AI notes generated",
-                token: AppPalette.noteTokens[1]
+                token: AppVisualToken(icon: "doc.text.fill", tint: AppTheme.notes)
             )
 
             DashboardStatCard(
                 title: "Flashcards",
                 value: "\(totalFlashcards)",
-                footnote: "Quick review cards",
-                token: AppPalette.noteTokens[4]
+                token: AppVisualToken(icon: "rectangle.on.rectangle", tint: AppTheme.flashcards)
             )
 
             DashboardStatCard(
                 title: "Quiz Accuracy",
                 value: "\(Int(accuracy * 100))%",
-                footnote: "Correct answers so far",
-                token: AppPalette.noteTokens[3]
+                token: AppVisualToken(icon: "target", tint: AppTheme.quiz)
             )
         }
     }
 
     private var recentNotesSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Label("Recent Notes", systemImage: "doc.text")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundStyle(AppTheme.ink)
-
-                Spacer()
-
-                Text("Latest")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundStyle(AppTheme.blue)
-            }
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Recent Notes")
+                .font(.title3.weight(.semibold))
 
             VStack(spacing: 0) {
                 if recentNotes.isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("No lecture notes yet")
-                            .font(.system(size: 20, weight: .bold, design: .rounded))
-                            .foregroundStyle(AppTheme.ink)
-
-                        Text("Create your first course, import a lecture, and your recent notes will appear here.")
-                            .font(.system(size: 15, weight: .medium, design: .rounded))
-                            .foregroundStyle(AppTheme.secondaryText)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(22)
+                    ContentUnavailableView(
+                        "No Notes Yet",
+                        systemImage: "doc.text",
+                        description: Text("Create your first course, import a lecture, and your recent notes will appear here.")
+                    )
                 } else {
                     ForEach(Array(recentNotes.enumerated()), id: \.element.id) { index, item in
                         NavigationLink {
@@ -215,67 +154,56 @@ struct DashboardView: View {
 
                         if index < recentNotes.count - 1 {
                             Divider()
-                                .padding(.horizontal, 22)
+                                .padding(.leading, 64)
                         }
                     }
                 }
             }
-            .appCard()
+            .cardBackground()
         }
     }
 
     private var progressSection: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                Label("Your Learning Progress", systemImage: "chart.line.uptrend.xyaxis")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundStyle(AppTheme.ink)
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Learning Progress")
+                .font(.title3.weight(.semibold))
 
-                Spacer()
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .center, spacing: 20) {
+                    ProgressRing(progress: overallProgress)
 
-                Text("This Week")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundStyle(AppTheme.blue)
-            }
+                    VStack(spacing: 14) {
+                        ProgressMetricRow(
+                            title: "Notes Created",
+                            detail: "\(totalNotes) total",
+                            progress: min(Double(totalNotes) / 8.0, 1),
+                            tint: Color.accentColor
+                        )
 
-            HStack(alignment: .center, spacing: 24) {
-                ProgressRing(progress: overallProgress, lineWidth: 14)
-                    .frame(width: 124, height: 124)
+                        ProgressMetricRow(
+                            title: "Flashcards Ready",
+                            detail: "\(totalFlashcards) card\(totalFlashcards == 1 ? "" : "s")",
+                            progress: min(Double(totalFlashcards) / 30.0, 1),
+                            tint: AppTheme.flashcards
+                        )
 
-                VStack(spacing: 18) {
-                    ProgressMetricRow(
-                        title: "Notes Created",
-                        detail: "\(totalNotes) total",
-                        progress: min(Double(totalNotes) / 8.0, 1),
-                        color: AppTheme.blue
-                    )
-
-                    ProgressMetricRow(
-                        title: "Flashcards Ready",
-                        detail: "\(totalFlashcards) cards",
-                        progress: min(Double(totalFlashcards) / 30.0, 1),
-                        color: AppTheme.mint
-                    )
-
-                    ProgressMetricRow(
-                        title: "Quiz Accuracy",
-                        detail: "\(Int(accuracy * 100))%",
-                        progress: accuracy,
-                        color: AppTheme.purple
-                    )
+                        ProgressMetricRow(
+                            title: "Quiz Accuracy",
+                            detail: "\(Int(accuracy * 100))%",
+                            progress: accuracy,
+                            tint: AppTheme.quiz
+                        )
+                    }
                 }
-            }
 
-            Text(totalNotes == 0 ? "Add your first lecture to start building study momentum." : "Great job! Your lecture archive is growing steadily.")
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(AppTheme.blue)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(AppTheme.blue.opacity(0.10))
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                Text(totalNotes == 0 ? "Add your first lecture to start building study momentum." : "Great job! Your lecture archive is growing steadily.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
+            .cardBackground()
         }
-        .padding(22)
-        .appCard()
     }
 }
 
@@ -291,28 +219,23 @@ private struct DashboardRecentNote: Identifiable {
 private struct DashboardStatCard: View {
     let title: String
     let value: String
-    let footnote: String
     let token: AppVisualToken
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            AppIconTile(token: token, size: 52)
-
-            Text(title)
-                .font(.system(size: 16, weight: .semibold, design: .rounded))
-                .foregroundStyle(AppTheme.secondaryText)
+        VStack(alignment: .leading, spacing: 8) {
+            AppIconBadge(token: token, size: 30)
 
             Text(value)
-                .font(.system(size: 30, weight: .bold, design: .rounded))
-                .foregroundStyle(AppTheme.ink)
+                .font(.title.weight(.bold))
+                .monospacedDigit()
 
-            Text(footnote)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(token.tint)
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(18)
-        .appCard()
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .padding(16)
+        .cardBackground()
     }
 }
 
@@ -320,37 +243,26 @@ private struct DashboardRecentNoteRow: View {
     let item: DashboardRecentNote
 
     var body: some View {
-        let token = AppPalette.noteToken(for: item.note.title)
+        HStack(spacing: 12) {
+            AppIconBadge(token: AppPalette.noteToken(for: item.note.title), size: 36)
 
-        HStack(spacing: 16) {
-            AppIconTile(token: token, size: 64)
-
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(item.note.title)
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundStyle(AppTheme.ink)
+                    .font(.headline)
                     .lineLimit(2)
 
                 Text("\(item.courseTitle) • \(item.note.createdAt.formatted(date: .abbreviated, time: .omitted))")
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundStyle(AppTheme.secondaryText)
-
-                HStack(spacing: 8) {
-                    AppPill(text: "AI Notes", color: AppTheme.blue)
-
-                    if !item.note.flashcards.isEmpty {
-                        AppPill(text: "Flashcards", color: AppTheme.purple)
-                    }
-
-                    if !item.note.quizQuestions.isEmpty {
-                        AppPill(text: "Quiz", color: AppTheme.orange)
-                    }
-                }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(Color(uiColor: .tertiaryLabel))
         }
-        .padding(18)
+        .padding(16)
     }
 }
 
@@ -358,33 +270,24 @@ private struct ProgressMetricRow: View {
     let title: String
     let detail: String
     let progress: Double
-    let color: Color
+    let tint: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(title)
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(AppTheme.ink)
+                    .font(.subheadline)
 
                 Spacer()
 
                 Text(detail)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(AppTheme.secondaryText)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
             }
 
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(color.opacity(0.12))
-
-                    Capsule()
-                        .fill(color)
-                        .frame(width: geometry.size.width * max(0, min(progress, 1)))
-                }
-            }
-            .frame(height: 8)
+            ProgressView(value: progress)
+                .tint(tint)
         }
     }
 }

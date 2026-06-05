@@ -25,114 +25,44 @@ struct LoginView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            AppBackground {
-                AppScrollPage(topPadding: 24, bottomPadding: 48) {
-                    VStack(spacing: 28) {
-                        topBranding
-                        heroCard
-                        loginCard
-                    }
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        focusedField = nil
-                    }
-                }
-                .scrollDismissesKeyboard(.interactively)
+        ScrollView {
+            VStack(spacing: 24) {
+                branding
+                fields
+                loginButton
+                orDivider
+                appleButton
+                signUpRow
             }
-            .toolbar(.hidden, for: .navigationBar)
-        }
-    }
-
-    private var topBranding: some View {
-        VStack(spacing: 18) {
-            HStack(spacing: 16) {
-                LectureMateLogoMark(size: 68)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("LectureMate AI")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppTheme.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-
-                    Text("Your AI Study Partner")
-                        .font(.system(size: 17, weight: .medium, design: .rounded))
-                        .foregroundStyle(AppTheme.secondaryText)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            VStack(spacing: 10) {
-                Text("Welcome back! 👋")
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                    .foregroundStyle(AppTheme.ink)
-
-                Text("Turn lectures into smart study notes.")
-                    .font(.system(size: 17, weight: .medium, design: .rounded))
-                    .foregroundStyle(AppTheme.secondaryText)
+            .padding(.horizontal, 20)
+            .padding(.top, 24)
+            .padding(.bottom, 48)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                focusedField = nil
             }
         }
+        .scrollDismissesKeyboard(.interactively)
     }
 
-    private var heroCard: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 34, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.75),
-                            AppTheme.blue.opacity(0.09),
-                            AppTheme.purple.opacity(0.08)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(height: 260)
-                .frame(maxWidth: .infinity)
+    private var branding: some View {
+        VStack(spacing: 12) {
+            LectureMateLogoMark(size: 72)
 
-            Circle()
-                .fill(AppTheme.blue.opacity(0.08))
-                .frame(width: 180, height: 180)
-                .offset(x: -110, y: 12)
+            Text("LectureMate AI")
+                .font(.largeTitle.weight(.bold))
 
-            Circle()
-                .fill(AppTheme.purple.opacity(0.08))
-                .frame(width: 132, height: 132)
-                .offset(x: 120, y: -50)
-
-            VStack(spacing: 18) {
-                HStack(spacing: 14) {
-                    floatingHeroTile(icon: "waveform", gradient: AppTheme.coolGradient)
-                    floatingHeroTile(icon: "doc.text", gradient: AppTheme.mintGradient)
-                }
-                .offset(y: 8)
-
-                ZStack {
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(Color.white.opacity(0.9))
-                        .frame(width: 150, height: 112)
-                        .rotationEffect(.degrees(-8))
-
-                    Image(systemName: "book.pages.fill")
-                        .font(.system(size: 46, weight: .semibold, design: .rounded))
-                        .foregroundStyle(AppTheme.primaryGradient)
-                }
-                .shadow(color: AppTheme.softShadow, radius: 20, x: 0, y: 12)
-
-                HStack(spacing: 16) {
-                    floatingHeroTile(icon: "rectangle.on.rectangle", gradient: AppTheme.coolGradient)
-                    floatingHeroTile(icon: "target", gradient: LinearGradient(colors: [AppTheme.orange, AppTheme.red], startPoint: .leading, endPoint: .trailing))
-                }
-            }
+            Text("Turn lectures into smart study notes.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
-        .appCard(cornerRadius: 34)
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
     }
 
-    private var loginCard: some View {
-        VStack(spacing: 20) {
-            inputRow(systemImage: "envelope", placeholder: "Email address") {
+    private var fields: some View {
+        VStack(spacing: 12) {
+            inputRow(systemImage: "envelope") {
                 TextField("Email address", text: $email)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.emailAddress)
@@ -144,7 +74,7 @@ struct LoginView: View {
                     }
             }
 
-            inputRow(systemImage: "lock", placeholder: "Password") {
+            inputRow(systemImage: "lock") {
                 SecureField("Password", text: $password)
                     .focused($focusedField, equals: .password)
                     .submitLabel(.go)
@@ -153,88 +83,78 @@ struct LoginView: View {
                     }
             }
 
-            HStack {
-                Spacer()
-
-                Text("Forgot password?")
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(AppTheme.blue)
-            }
-
-            Button(action: submitLogin) {
-                HStack(spacing: 10) {
-                    Image(systemName: "sparkles")
-                    Text("Login")
-                }
-            }
-            .buttonStyle(AppPrimaryButtonStyle())
-            .disabled(!canLogin)
-            .opacity(canLogin ? 1.0 : 0.72)
-
-            HStack {
-                Rectangle()
-                    .fill(AppTheme.blue.opacity(0.10))
-                    .frame(height: 1)
-
-                Text("or")
-                    .font(.system(size: 16, weight: .medium, design: .rounded))
-                    .foregroundStyle(AppTheme.secondaryText)
-                    .padding(.horizontal, 12)
-
-                Rectangle()
-                    .fill(AppTheme.blue.opacity(0.10))
-                    .frame(height: 1)
-            }
-
-            Button { } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "apple.logo")
-                    Text("Continue with Apple")
-                }
-            }
-            .buttonStyle(AppSecondaryButtonStyle())
-
-            HStack(spacing: 6) {
-                Text("Don't have an account?")
-                    .foregroundStyle(AppTheme.secondaryText)
-
-                Text("Sign up")
-                    .foregroundStyle(AppTheme.blue)
-            }
-            .font(.system(size: 17, weight: .semibold, design: .rounded))
+            Button("Forgot password?") { }
+                .font(.subheadline)
+                .foregroundStyle(.tint)
+                .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .padding(20)
-        .appCard(cornerRadius: 32)
     }
 
-    private func floatingHeroTile(icon: String, gradient: LinearGradient) -> some View {
-        RoundedRectangle(cornerRadius: 20, style: .continuous)
-            .fill(Color.white.opacity(0.84))
-            .frame(width: 82, height: 64)
-            .overlay {
-                Image(systemName: icon)
-                    .font(.system(size: 24, weight: .semibold, design: .rounded))
-                    .foregroundStyle(gradient)
-            }
-            .shadow(color: AppTheme.softShadow, radius: 16, x: 0, y: 10)
+    private var loginButton: some View {
+        Button(action: submitLogin) {
+            Text("Log In")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .disabled(!canLogin)
+    }
+
+    private var orDivider: some View {
+        HStack(spacing: 12) {
+            VStack { Divider() }
+
+            Text("or")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            VStack { Divider() }
+        }
+    }
+
+    private var appleButton: some View {
+        Button { } label: {
+            Label("Continue with Apple", systemImage: "apple.logo")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(Color(uiColor: .systemBackground))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    Color.primary,
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var signUpRow: some View {
+        HStack(spacing: 4) {
+            Text("Don't have an account?")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Button("Sign Up") { }
+                .font(.subheadline.weight(.semibold))
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private func inputRow<Content: View>(
         systemImage: String,
-        placeholder: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
             Image(systemName: systemImage)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(AppTheme.blue)
-                .frame(width: 26)
+                .foregroundStyle(.secondary)
 
             content()
-                .font(.system(size: 17, weight: .medium, design: .rounded))
-                .foregroundStyle(AppTheme.ink)
+                .font(.body)
         }
-        .appInputField()
+        .padding(14)
+        .background(
+            Color(uiColor: .secondarySystemBackground),
+            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+        )
     }
 
     private func submitLogin() {
@@ -242,4 +162,9 @@ struct LoginView: View {
         focusedField = nil
         authManager.login(email: email, password: password)
     }
+}
+
+#Preview {
+    LoginView()
+        .environmentObject(AuthManager())
 }

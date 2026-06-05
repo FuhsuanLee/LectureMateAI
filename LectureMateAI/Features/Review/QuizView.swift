@@ -25,66 +25,52 @@ struct QuizView: View {
     }
 
     var body: some View {
-        AppBackground {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 22) {
-                    if questions.isEmpty {
-                        VStack(spacing: 16) {
-                            Text("No Quiz Yet")
-                                .font(.system(size: 30, weight: .bold, design: .rounded))
-                                .foregroundStyle(AppTheme.ink)
-
-                            Text("Generate notes first to create quiz questions.")
-                                .font(.system(size: 16, weight: .medium, design: .rounded))
-                                .foregroundStyle(AppTheme.secondaryText)
+        Group {
+            if questions.isEmpty {
+                ContentUnavailableView(
+                    "No Quiz Yet",
+                    systemImage: "target",
+                    description: Text("Generate notes first to create quiz questions.")
+                )
+            } else {
+                ScrollView {
+                    VStack(spacing: 24) {
+                        if let currentQuestion {
+                            progressSection
+                            questionCard(question: currentQuestion)
+                        } else {
+                            summaryCard
                         }
-                        .padding(24)
-                        .appCard(cornerRadius: 30)
-                    } else if let currentQuestion {
-                        progressSection
-                        questionCard(question: currentQuestion)
-                    } else {
-                        summaryCard
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                    .padding(.bottom, 24)
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 20)
-                .padding(.bottom, 36)
-                .frame(maxWidth: .infinity)
             }
         }
+        .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Quiz")
-        .navigationBarTitleDisplayMode(.inline)
     }
 
     private var progressSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 8) {
             Text("Question \(currentIndex + 1) of \(questions.count)")
-                .font(.system(size: 30, weight: .bold, design: .rounded))
-                .foregroundStyle(AppTheme.ink)
+                .font(.headline)
+                .monospacedDigit()
 
-            HStack(spacing: 12) {
-                ForEach(questions.indices, id: \.self) { index in
-                    Capsule()
-                        .fill(index <= currentIndex ? AnyShapeStyle(AppTheme.primaryGradient) : AnyShapeStyle(AppTheme.blue.opacity(0.10)))
-                        .frame(height: 8)
-                }
-            }
+            ProgressView(value: Double(currentIndex), total: Double(questions.count))
+                .tint(AppTheme.quiz)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func questionCard(question: QuizQuestion) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(spacing: 10) {
-                AppPill(text: "AI Quiz", color: AppTheme.purple)
-                Spacer()
-            }
-
+        VStack(alignment: .leading, spacing: 16) {
             Text(question.question)
-                .font(.system(size: 34, weight: .bold, design: .rounded))
-                .foregroundStyle(AppTheme.ink)
+                .font(.title3.weight(.semibold))
 
-            VStack(spacing: 14) {
+            VStack(spacing: 12) {
                 ForEach(question.options.indices, id: \.self) { index in
                     Button {
                         answer(question, with: index)
@@ -98,58 +84,54 @@ struct QuizView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .disabled(question.isAnswered)
                 }
             }
 
             if question.isAnswered {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 10) {
-                        AppIconTile(token: AppPalette.noteTokens[1], size: 56)
+                Divider()
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Explanation")
-                                .font(.system(size: 24, weight: .bold, design: .rounded))
-                                .foregroundStyle(AppTheme.ink)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Explanation")
+                        .font(.headline)
 
-                            Text(question.isCorrect ? "Nice work, you got it right." : "Review the concept before moving on.")
-                                .font(.system(size: 15, weight: .medium, design: .rounded))
-                                .foregroundStyle(AppTheme.secondaryText)
-                        }
-                    }
+                    Text(question.isCorrect ? "Nice work, you got it right." : "Review the concept before moving on.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
 
                     Text(question.explanation)
-                        .font(.system(size: 17, weight: .medium, design: .rounded))
-                        .foregroundStyle(AppTheme.secondaryText)
-
-                    Button(currentIndex == questions.count - 1 ? "Finish Quiz" : "Next Question") {
-                        goToNextQuestion()
-                    }
-                    .buttonStyle(AppPrimaryButtonStyle())
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
-                .padding(20)
-                .background(AppTheme.mint.opacity(0.10))
-                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+
+                Button {
+                    goToNextQuestion()
+                } label: {
+                    Text(currentIndex == questions.count - 1 ? "Finish Quiz" : "Next Question")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
             }
         }
-        .padding(24)
-        .appCard(cornerRadius: 32)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardBackground()
     }
 
     private var summaryCard: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 16) {
             ProgressRing(
                 progress: questions.isEmpty ? 0 : Double(correctAnswers) / Double(questions.count),
-                lineWidth: 16
+                size: 140
             )
-            .frame(width: 180, height: 180)
 
             Text("Quiz Complete")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
-                .foregroundStyle(AppTheme.ink)
+                .font(.title2.weight(.bold))
 
             Text("You answered \(correctAnswers) out of \(questions.count) questions correctly.")
-                .font(.system(size: 18, weight: .medium, design: .rounded))
-                .foregroundStyle(AppTheme.secondaryText)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
             Button("Restart Quiz") {
@@ -160,10 +142,12 @@ struct QuizView: View {
                 try? modelContext.save()
                 currentIndex = 0
             }
-            .buttonStyle(AppPrimaryButtonStyle())
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
         }
-        .padding(24)
-        .appCard(cornerRadius: 32)
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .cardBackground()
     }
 
     private func answer(_ question: QuizQuestion, with index: Int) {
@@ -192,57 +176,103 @@ private struct QuizOptionRow: View {
     let isCorrect: Bool
     let isAnswered: Bool
 
-    private var borderColor: Color {
-        if isSelected {
-            return isCorrect ? AppTheme.mint : AppTheme.blue
-        }
+    @ScaledMetric(relativeTo: .body) private var letterSize: CGFloat = 32
 
-        return AppTheme.blue.opacity(0.10)
+    // Green for the right pick, red for the wrong one. Selection only
+    // happens at answer time, so a selected row is always answered.
+    private var selectionTint: Color {
+        isCorrect ? .green : .red
     }
 
-    private var fillColor: Color {
-        if isSelected {
-            return isCorrect ? AppTheme.mint.opacity(0.10) : AppTheme.blue.opacity(0.08)
+    private var rowFill: Color {
+        if isCorrect {
+            return Color.green.opacity(0.15)
         }
 
-        return Color.white.opacity(0.75)
+        if isSelected {
+            return Color.red.opacity(0.15)
+        }
+
+        return Color(uiColor: .tertiarySystemFill)
+    }
+
+    private var borderColor: Color {
+        isSelected ? selectionTint : Color(uiColor: .separator)
+    }
+
+    private var statusDescription: String {
+        if isSelected {
+            return isCorrect ? "Correct" : "Incorrect"
+        }
+
+        if isAnswered && isCorrect {
+            return "Correct answer"
+        }
+
+        return ""
     }
 
     var body: some View {
-        HStack(spacing: 18) {
+        HStack(spacing: 12) {
             Text(letter)
-                .font(.system(size: 24, weight: .bold, design: .rounded))
-                .foregroundStyle(isSelected ? .white : AppTheme.ink)
-                .frame(width: 56, height: 56)
+                .font(.headline)
+                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                .frame(width: letterSize, height: letterSize)
                 .background(
-                    Circle()
-                        .fill(isSelected ? AnyShapeStyle(AppTheme.primaryGradient) : AnyShapeStyle(AppTheme.blue.opacity(0.08)))
+                    isSelected ? selectionTint : Color(uiColor: .tertiarySystemFill),
+                    in: Circle()
                 )
 
             Text(text)
-                .font(.system(size: 20, weight: .medium, design: .rounded))
-                .foregroundStyle(AppTheme.ink)
+                .font(.body)
                 .multilineTextAlignment(.leading)
 
             Spacer()
 
             if isSelected {
                 Image(systemName: isCorrect ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(isCorrect ? AppTheme.mint : AppTheme.red)
+                    .font(.title3)
+                    .foregroundStyle(isCorrect ? Color.green : Color.red)
             } else if isAnswered && isCorrect {
                 Image(systemName: "checkmark.circle")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(AppTheme.mint)
+                    .font(.title3)
+                    .foregroundStyle(.green)
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 18)
-        .background(fillColor)
+        .padding(12)
+        .background(rowFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(borderColor, lineWidth: isSelected ? 2 : 1)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(borderColor, lineWidth: isSelected ? 2 : 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Option \(letter): \(text)")
+        .accessibilityValue(statusDescription)
     }
+}
+
+#Preview {
+    NavigationStack {
+        QuizView(questions: [
+            QuizQuestion(
+                question: "哪一個排序法平均時間複雜度是 O(n log n)？",
+                options: ["Bubble Sort", "Selection Sort", "Merge Sort", "Insertion Sort"],
+                correctIndex: 2,
+                explanation: "Merge Sort 採用分治法，平均與最壞情況都能維持 O(n log n)。"
+            ),
+            QuizQuestion(
+                question: "Which container manages a navigation path in SwiftUI?",
+                options: ["TabView", "NavigationStack", "List", "ScrollView"],
+                correctIndex: 1,
+                explanation: "NavigationStack manages a stack of views pushed with NavigationLink."
+            )
+        ])
+    }
+    .modelContainer(for: [
+        Course.self,
+        LectureNote.self,
+        Flashcard.self,
+        QuizQuestion.self
+    ], inMemory: true)
 }
