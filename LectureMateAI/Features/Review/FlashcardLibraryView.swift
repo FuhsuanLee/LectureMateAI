@@ -19,113 +19,198 @@ struct FlashcardLibraryView: View {
 
     private var allFlashcards: [Flashcard] {
         coursesWithFlashcards
-            .flatMap { $0.notes }
-            .flatMap { $0.flashcards }
+            .flatMap(\.notes)
+            .flatMap(\.flashcards)
     }
 
     private var totalDecks: Int {
         coursesWithFlashcards
-            .flatMap { $0.notes }
+            .flatMap(\.notes)
             .filter { !$0.flashcards.isEmpty }
             .count
     }
 
     var body: some View {
         NavigationStack {
-            List {
-                if allFlashcards.isEmpty {
-                    ContentUnavailableView(
-                        "No Flashcards Yet",
-                        systemImage: "rectangle.on.rectangle.slash",
-                        description: Text("Generate a lecture note first, then the app will create flashcards for review.")
-                    )
-                } else {
-                    Section {
-                        NavigationLink {
-                            FlashcardReviewView(
-                                flashcards: allFlashcards,
-                                deckTitle: "All Flashcards"
-                            )
-                        } label: {
-                            FlashcardDeckRow(
-                                title: "All Flashcards",
-                                subtitle: "\(totalDecks) decks across \(coursesWithFlashcards.count) courses",
-                                count: allFlashcards.count,
-                                systemImage: "square.stack.3d.up.fill",
-                                tint: .blue
-                            )
-                        }
-                    } header: {
-                        Text("Quick Review")
-                    }
-
-                    ForEach(coursesWithFlashcards) { course in
-                        Section(course.title) {
-                            ForEach(course.notesWithFlashcards) { note in
-                                NavigationLink {
-                                    FlashcardReviewView(
-                                        flashcards: note.flashcards,
-                                        deckTitle: note.title
-                                    )
-                                } label: {
-                                    FlashcardDeckRow(
-                                        title: note.title,
-                                        subtitle: note.createdAt.formatted(date: .abbreviated, time: .shortened),
-                                        count: note.flashcards.count,
-                                        systemImage: "rectangle.stack.fill",
-                                        tint: .orange
-                                    )
-                                }
-                            }
-                        }
+            AppBackground {
+                AppScrollPage(topPadding: 22) {
+                    VStack(alignment: .leading, spacing: 22) {
+                        headerSection
+                        summarySection
+                        quickReviewSection
+                        deckSection
                     }
                 }
             }
-            .navigationTitle("Flashcards")
+            .toolbar(.hidden, for: .navigationBar)
         }
+    }
+
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Flashcards")
+                .font(.system(size: 40, weight: .bold, design: .rounded))
+                .foregroundStyle(AppTheme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+
+            Text("Review important terms from your AI lecture notes")
+                .font(.system(size: 18, weight: .medium, design: .rounded))
+                .foregroundStyle(AppTheme.secondaryText)
+        }
+    }
+
+    private var summarySection: some View {
+        HStack(spacing: 16) {
+            FlashcardMetricCard(
+                title: "Total Cards",
+                value: "\(allFlashcards.count)",
+                token: AppPalette.noteTokens[4]
+            )
+
+            FlashcardMetricCard(
+                title: "Decks",
+                value: "\(totalDecks)",
+                token: AppPalette.noteTokens[0]
+            )
+        }
+    }
+
+    private var quickReviewSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("Quick Review", systemImage: "sparkles")
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .foregroundStyle(AppTheme.ink)
+
+            if allFlashcards.isEmpty {
+                emptyStateCard(
+                    title: "No flashcards yet",
+                    message: "Generate a lecture note first, then the app will create flashcards for review."
+                )
+            } else {
+                NavigationLink {
+                    FlashcardReviewView(
+                        flashcards: allFlashcards,
+                        deckTitle: "All Flashcards"
+                    )
+                } label: {
+                    FlashcardDeckCard(
+                        title: "All Flashcards",
+                        subtitle: "\(totalDecks) decks across \(coursesWithFlashcards.count) courses",
+                        count: allFlashcards.count,
+                        token: AppPalette.noteTokens[4]
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var deckSection: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            if !coursesWithFlashcards.isEmpty {
+                Label("By Course", systemImage: "books.vertical")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundStyle(AppTheme.ink)
+            }
+
+            ForEach(coursesWithFlashcards) { course in
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(course.title)
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundStyle(AppTheme.ink)
+
+                    ForEach(course.notesWithFlashcards) { note in
+                        NavigationLink {
+                            FlashcardReviewView(
+                                flashcards: note.flashcards,
+                                deckTitle: note.title
+                            )
+                        } label: {
+                            FlashcardDeckCard(
+                                title: note.title,
+                                subtitle: note.createdAt.formatted(date: .abbreviated, time: .shortened),
+                                count: note.flashcards.count,
+                                token: AppPalette.noteToken(for: note.title)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private func emptyStateCard(title: String, message: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .foregroundStyle(AppTheme.ink)
+
+            Text(message)
+                .font(.system(size: 16, weight: .medium, design: .rounded))
+                .foregroundStyle(AppTheme.secondaryText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(22)
+        .appCard()
     }
 }
 
-private struct FlashcardDeckRow: View {
+private struct FlashcardMetricCard: View {
+    let title: String
+    let value: String
+    let token: AppVisualToken
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            AppIconTile(token: token, size: 58)
+
+            Text(title)
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(AppTheme.secondaryText)
+
+            Text(value)
+                .font(.system(size: 27, weight: .bold, design: .rounded))
+                .foregroundStyle(AppTheme.ink)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
+        .appCard()
+    }
+}
+
+private struct FlashcardDeckCard: View {
     let title: String
     let subtitle: String
     let count: Int
-    let systemImage: String
-    let tint: Color
+    let token: AppVisualToken
 
     var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(tint.opacity(0.14))
-                    .frame(width: 46, height: 46)
+        HStack(spacing: 16) {
+            AppIconTile(token: token, size: 68)
 
-                Image(systemName: systemImage)
-                    .font(.headline)
-                    .foregroundStyle(tint)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text(title)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundStyle(AppTheme.ink)
                     .lineLimit(2)
 
                 Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(AppTheme.secondaryText)
+
+                AppPill(text: "\(count) cards", color: token.tint)
             }
 
             Spacer()
 
-            Text("\(count)")
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(.thinMaterial)
-                .clipShape(Capsule())
+            Image(systemName: "chevron.right")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(AppTheme.secondaryText)
         }
-        .padding(.vertical, 4)
+        .padding(18)
+        .appCard()
     }
 }
 
