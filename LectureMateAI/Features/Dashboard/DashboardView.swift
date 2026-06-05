@@ -310,7 +310,7 @@ private struct DashboardStatCard: View {
                 .font(.system(size: 13, weight: .medium, design: .rounded))
                 .foregroundStyle(token.tint)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(18)
         .appCard()
     }

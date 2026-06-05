@@ -26,31 +26,32 @@ struct QuizView: View {
 
     var body: some View {
         AppBackground {
-            VStack(spacing: 22) {
-                if questions.isEmpty {
-                    VStack(spacing: 16) {
-                        Text("No Quiz Yet")
-                            .font(.system(size: 30, weight: .bold, design: .rounded))
-                            .foregroundStyle(AppTheme.ink)
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 22) {
+                    if questions.isEmpty {
+                        VStack(spacing: 16) {
+                            Text("No Quiz Yet")
+                                .font(.system(size: 30, weight: .bold, design: .rounded))
+                                .foregroundStyle(AppTheme.ink)
 
-                        Text("Generate notes first to create quiz questions.")
-                            .font(.system(size: 16, weight: .medium, design: .rounded))
-                            .foregroundStyle(AppTheme.secondaryText)
+                            Text("Generate notes first to create quiz questions.")
+                                .font(.system(size: 16, weight: .medium, design: .rounded))
+                                .foregroundStyle(AppTheme.secondaryText)
+                        }
+                        .padding(24)
+                        .appCard(cornerRadius: 30)
+                    } else if let currentQuestion {
+                        progressSection
+                        questionCard(question: currentQuestion)
+                    } else {
+                        summaryCard
                     }
-                    .padding(24)
-                    .appCard(cornerRadius: 30)
-                } else if let currentQuestion {
-                    progressSection
-                    questionCard(question: currentQuestion)
-                    Spacer(minLength: 0)
-                } else {
-                    summaryCard
-                    Spacer(minLength: 0)
                 }
+                .padding(.horizontal, 24)
+                .padding(.top, 20)
+                .padding(.bottom, 36)
+                .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 20)
-            .padding(.bottom, 36)
         }
         .navigationTitle("Quiz")
         .navigationBarTitleDisplayMode(.inline)

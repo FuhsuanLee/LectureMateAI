@@ -60,12 +60,11 @@ struct FlashcardReviewView: View {
                     controlsSection
                     statsSection
                 }
-
-                Spacer(minLength: 0)
             }
             .padding(.horizontal, 24)
             .padding(.top, 20)
             .padding(.bottom, 36)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .navigationTitle(deckTitle)
         .navigationBarTitleDisplayMode(.inline)
@@ -97,13 +96,13 @@ struct FlashcardReviewView: View {
         ZStack {
             RoundedRectangle(cornerRadius: 34, style: .continuous)
                 .fill(AppTheme.purple.opacity(0.07))
-                .frame(height: 520)
+                .frame(maxWidth: .infinity, maxHeight: 520)
                 .rotationEffect(.degrees(-4))
                 .offset(x: -10, y: 10)
 
             RoundedRectangle(cornerRadius: 34, style: .continuous)
                 .fill(AppTheme.blue.opacity(0.07))
-                .frame(height: 520)
+                .frame(maxWidth: .infinity, maxHeight: 520)
                 .rotationEffect(.degrees(3))
                 .offset(x: 8, y: -4)
 
@@ -257,7 +256,7 @@ private struct FlashcardFaceView: View {
                 .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
                 .opacity(isFlipped ? 1 : 0)
         }
-        .frame(height: 520)
+        .frame(maxWidth: .infinity, maxHeight: 520)
         .rotation3DEffect(
             .degrees(isFlipped ? 180 : 0),
             axis: (x: 0, y: 1, z: 0)

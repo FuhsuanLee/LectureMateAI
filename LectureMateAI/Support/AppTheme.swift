@@ -97,30 +97,32 @@ struct AppBackground<Content: View>: View {
     }
 
     var body: some View {
-        ZStack {
-            AppTheme.pageGradient
+        content
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background {
+                ZStack {
+                    AppTheme.pageGradient
+
+                    Circle()
+                        .fill(AppTheme.blue.opacity(0.14))
+                        .frame(width: 360, height: 360)
+                        .blur(radius: 70)
+                        .offset(x: -120, y: -300)
+
+                    Circle()
+                        .fill(AppTheme.purple.opacity(0.12))
+                        .frame(width: 320, height: 320)
+                        .blur(radius: 70)
+                        .offset(x: 150, y: -220)
+
+                    Circle()
+                        .fill(Color.white.opacity(0.95))
+                        .frame(width: 540, height: 540)
+                        .blur(radius: 18)
+                        .offset(y: 320)
+                }
                 .ignoresSafeArea()
-
-            Circle()
-                .fill(AppTheme.blue.opacity(0.14))
-                .frame(width: 360, height: 360)
-                .blur(radius: 70)
-                .offset(x: -120, y: -300)
-
-            Circle()
-                .fill(AppTheme.purple.opacity(0.12))
-                .frame(width: 320, height: 320)
-                .blur(radius: 70)
-                .offset(x: 150, y: -220)
-
-            Circle()
-                .fill(Color.white.opacity(0.95))
-                .frame(width: 540, height: 540)
-                .blur(radius: 18)
-                .offset(y: 320)
-
-            content
-        }
+            }
     }
 }
 
@@ -151,10 +153,10 @@ struct AppScrollPage<Content: View>: View {
                 content
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, horizontalPadding)
             .padding(.top, topPadding)
             .padding(.bottom, bottomPadding)
         }
-        .contentMargins(.horizontal, horizontalPadding, for: .scrollContent)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
@@ -163,20 +165,22 @@ struct LectureMateLogoMark: View {
     var size: CGFloat = 72
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack {
             RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
                 .fill(AppTheme.primaryGradient)
                 .frame(width: size, height: size)
                 .shadow(color: AppTheme.blue.opacity(0.22), radius: 18, x: 0, y: 12)
 
             Image(systemName: "book.pages.fill")
-                .font(.system(size: size * 0.38, weight: .semibold, design: .rounded))
+                .font(.system(size: size * 0.44, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white)
-
+        }
+        .frame(width: size, height: size)
+        .overlay(alignment: .topTrailing) {
             Image(systemName: "sparkles")
-                .font(.system(size: size * 0.18, weight: .bold))
+                .font(.system(size: size * 0.2, weight: .bold))
                 .foregroundStyle(.white)
-                .padding(size * 0.14)
+                .padding(size * 0.12)
         }
     }
 }
