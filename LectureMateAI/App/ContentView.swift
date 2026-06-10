@@ -27,7 +27,8 @@ struct ContentView: View {
 private struct ContentViewPreview: View {
     @StateObject private var authManager: AuthManager = {
         let manager = AuthManager()
-        manager.login(email: "test@test.com", password: "123456")
+        manager.username = "octocat"
+        manager.isLoggedIn = true
         return manager
     }()
 
