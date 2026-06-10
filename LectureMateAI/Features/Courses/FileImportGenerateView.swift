@@ -93,7 +93,7 @@ private enum GenerationStage: Equatable {
         case .extractingPDF:
             return "Reading text from your PDF slides with PDFKit."
         case .transcribingAudio:
-            return "Sending the lecture audio to OpenAI and creating a transcript."
+            return "Processing the lecture audio and creating a transcript."
         case .generatingMarkdown:
             return "Combining the transcript and slide text into a structured markdown note."
         case .savingNote:
@@ -210,7 +210,7 @@ private enum ProcessingStep: Int, CaseIterable, Identifiable {
         case .extractPDF:
             return "Read slide content with PDFKit"
         case .transcribeAudio:
-            return "Create a transcript with OpenAI"
+            return "Create a transcript with AI"
         case .generateMarkdown:
             return "Combine transcript and slide content"
         case .saveNote:
@@ -252,7 +252,17 @@ struct FileImportGenerateView: View {
     @Environment(\.dismiss) private var dismiss
 
     let course: Course
-    private let openAIService = OpenAIService()
+    @AppStorage("aiBackendMode") private var aiBackendMode = AIBackendMode.cloud
+    @StateObject private var modelManager = ModelManager.shared
+
+    private var aiService: AIService {
+        switch aiBackendMode {
+        case .cloud:
+            return OpenAIService()
+        case .local:
+            return LocalAIService()
+        }
+    }
 
     @State private var lectureTitle = ""
 
@@ -262,6 +272,7 @@ struct FileImportGenerateView: View {
     @State private var selectedPDFFilename = ""
 
     @State private var transcript = ""
+    @State private var transcriptionProgress: Double = 0.0
     @State private var pdfText = ""
 
     @State private var showFileImporter = false
@@ -281,10 +292,16 @@ struct FileImportGenerateView: View {
     }
 
     private var canGenerateNote: Bool {
-        !trimmedLectureTitle.isEmpty &&
+        let baseCheck = !trimmedLectureTitle.isEmpty &&
         selectedAudioURL != nil &&
         selectedPDFURL != nil &&
         !isBusy
+        
+        if aiBackendMode == .local {
+            return baseCheck && modelManager.gemmaState == .downloaded
+        }
+        
+        return baseCheck
     }
 
     var body: some View {
@@ -335,9 +352,30 @@ struct FileImportGenerateView: View {
                                 Text(generateButtonTitle)
 
                                 if !isGeneratingNote {
-                                    Text("AI will create a structured markdown note from your lecture")
-                                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                                        .foregroundStyle(.white.opacity(0.85))
+                                    if aiBackendMode == .local {
+                                        switch modelManager.gemmaState {
+                                        case .notDownloaded:
+                                            Text("Please download the Gemma 4 model in Settings first")
+                                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                                                .foregroundStyle(.white.opacity(0.85))
+                                        case .downloading(let progress):
+                                            Text("Downloading model... \(Int(progress * 100))%")
+                                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                                                .foregroundStyle(.white.opacity(0.85))
+                                        case .error(let message):
+                                            Text("Model Error: \(message)")
+                                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                                                .foregroundStyle(.white.opacity(0.85))
+                                        case .downloaded:
+                                            Text("Gemma 4 model ready for on-device generation")
+                                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                                                .foregroundStyle(.white.opacity(0.85))
+                                        }
+                                    } else {
+                                        Text("AI will create a structured markdown note from your lecture")
+                                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                                            .foregroundStyle(.white.opacity(0.85))
+                                    }
                                 }
                             }
                         }
@@ -600,14 +638,19 @@ struct FileImportGenerateView: View {
                     generationStage = .transcribingAudio
                 }
 
-                let transcribedText = try await openAIService.transcribeAudio(fileURL: selectedAudioURL)
+                let transcribedText = try await aiService.transcribeAudio(fileURL: selectedAudioURL) { partial, progress in
+                    Task { @MainActor in
+                        self.transcript = partial
+                        self.transcriptionProgress = progress
+                    }
+                }
 
                 await MainActor.run {
                     transcript = transcribedText
                     generationStage = .generatingMarkdown
                 }
 
-                let markdown = try await openAIService.generateMarkdownNote(
+                let markdown = try await aiService.generateMarkdownNote(
                     lectureTitle: title,
                     transcript: transcribedText,
                     pdfText: extractedPDFText
@@ -712,6 +755,33 @@ struct FileImportGenerateView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(ProcessingStep.allCases) { step in
                         processingStepRow(step: step, state: processingState(for: step))
+                        
+                        if step == .transcribeAudio && generationStage == .transcribingAudio {
+                            VStack(alignment: .leading, spacing: 6) {
+                                if transcriptionProgress > 0 {
+                                    HStack {
+                                        ProgressView(value: transcriptionProgress)
+                                            .tint(.blue)
+                                        Text("\(Int(transcriptionProgress * 100))%")
+                                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                                            .foregroundStyle(.blue)
+                                    }
+                                }
+
+                                if !transcript.isEmpty {
+                                    Text(transcript)
+                                        .font(.system(size: 13, design: .monospaced))
+                                        .foregroundStyle(AppTheme.secondaryText)
+                                        .lineLimit(3)
+                                        .padding(8)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.05)))
+                                        .transition(.opacity)
+                                }
+                            }
+                            .padding(.leading, 32)
+                            .padding(.vertical, 4)
+                        }
                     }
                 }
                 .padding(.top, 4)
@@ -737,7 +807,7 @@ struct FileImportGenerateView: View {
 
     private var statusCardDetail: String {
         if generationStage == .idle {
-            return "When you tap Generate, the app will extract PDF text, transcribe your lecture audio with OpenAI, and save the markdown note automatically."
+            return "When you tap Generate, the app will extract PDF text, transcribe your lecture audio with AI, and save the markdown note automatically."
         }
 
         return generationStage.detail
@@ -751,7 +821,7 @@ struct FileImportGenerateView: View {
 
             Text(errorMessage)
                 .font(.system(size: 15, weight: .medium, design: .rounded))
-                .foregroundStyle(.primary)
+                .foregroundStyle(AppTheme.secondaryText)
 
             if let suggestion = recoverySuggestion {
                 Text(suggestion)

@@ -14,11 +14,22 @@ struct GenerateNoteView: View {
     @Environment(\.dismiss) private var dismiss
 
     let course: Course
+    @AppStorage("aiBackendMode") private var aiBackendMode = AIBackendMode.cloud
+    @StateObject private var modelManager = ModelManager.shared
 
     @State private var lectureTitle = ""
     @State private var transcript = ""
     @State private var slideText = ""
     @State private var isGenerating = false
+
+    private var aiService: AIService {
+        switch aiBackendMode {
+        case .cloud:
+            return OpenAIService()
+        case .local:
+            return LocalAIService()
+        }
+    }
 
     private let tip = GenerateNoteTip()
 
@@ -55,13 +66,35 @@ struct GenerateNoteView: View {
                 Button {
                     generateNote()
                 } label: {
-                    HStack {
-                        if isGenerating {
-                            ProgressView()
-                        }
+                    VStack(spacing: 4) {
+                        HStack {
+                            if isGenerating {
+                                ProgressView()
+                            }
 
-                        Text(isGenerating ? "Generating..." : "Generate AI Note")
-                            .fontWeight(.semibold)
+                            Text(isGenerating ? "Generating..." : "Generate AI Note")
+                                .fontWeight(.semibold)
+                        }
+                        
+                        if aiBackendMode == .local {
+                            switch modelManager.gemmaState {
+                            case .notDownloaded:
+                                Text("Download Gemma 4 in Settings first")
+                                    .font(.caption2)
+                                    .opacity(0.8)
+                            case .downloading(let progress):
+                                Text("Downloading Gemma 4... \(Int(progress * 100))%")
+                                    .font(.caption2)
+                                    .opacity(0.8)
+                            case .error(let message):
+                                Text("Model Error: \(message)")
+                                    .font(.caption2)
+                                    .opacity(0.8)
+                                    .foregroundStyle(.red)
+                            case .downloaded:
+                                EmptyView()
+                            }
+                        }
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -69,7 +102,7 @@ struct GenerateNoteView: View {
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
-                .disabled(lectureTitle.isEmpty || transcript.isEmpty || isGenerating)
+                .disabled(lectureTitle.isEmpty || transcript.isEmpty || isGenerating || (aiBackendMode == .local && modelManager.gemmaState != .downloaded))
             }
             .padding()
         }
@@ -79,28 +112,35 @@ struct GenerateNoteView: View {
     private func generateNote() {
         isGenerating = true
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            let result = MockAIService.generateNote(
-                lectureTitle: lectureTitle,
-                transcript: transcript,
-                slideText: slideText
-            )
+        Task {
+            do {
+                let markdown = try await aiService.generateMarkdownNote(
+                    lectureTitle: lectureTitle,
+                    transcript: transcript,
+                    pdfText: slideText
+                )
 
-            let note = LectureNote(
-                title: lectureTitle,
-                markdown: result.markdown
-            )
+                await MainActor.run {
+                    let note = LectureNote(
+                        title: lectureTitle,
+                        markdown: markdown
+                    )
 
-            note.flashcards = result.flashcards
-            note.quizQuestions = result.quizQuestions
+                    note.flashcards = AIOutputParser.parseFlashcards(from: markdown)
 
-            modelContext.insert(note)
-            course.notes.append(note)
+                    modelContext.insert(note)
+                    course.notes.append(note)
 
-            try? modelContext.save()
+                    try? modelContext.save()
 
-            isGenerating = false
-            dismiss()
+                    isGenerating = false
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    isGenerating = false
+                }
+            }
         }
     }
 }

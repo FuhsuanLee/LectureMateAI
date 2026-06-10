@@ -12,6 +12,8 @@ struct SettingsView: View {
 
     @State private var notificationsEnabled = true
     @State private var studyReminderEnabled = true
+    @AppStorage("aiBackendMode") private var aiBackendMode = AIBackendMode.cloud
+    @StateObject private var modelManager = ModelManager.shared
 
     private var displayName: String {
         let username = authManager.username.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -28,6 +30,7 @@ struct SettingsView: View {
                         headerSection
                         profileCard
                         preferencesCard
+                        aiPreferencesCard
                         supportCard
                         logoutCard
                     }
@@ -117,6 +120,118 @@ struct SettingsView: View {
         }
         .padding(18)
         .appCard(cornerRadius: 30)
+    }
+
+    private var aiPreferencesCard: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("AI Preferences")
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundStyle(AppTheme.ink)
+
+            VStack(alignment: .leading, spacing: 14) {
+                Picker("AI Backend", selection: $aiBackendMode) {
+                    ForEach(AIBackendMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Text(aiBackendMode.description)
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(AppTheme.secondaryText)
+                    .padding(.horizontal, 4)
+                
+                if aiBackendMode == .local {
+                    Divider().padding(.vertical, 8)
+                    
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Gemma 4 E2B Model")
+                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .foregroundStyle(AppTheme.ink)
+                                
+                                Text("~1.2 GB • Optimized for Mobile")
+                                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                                    .foregroundStyle(AppTheme.secondaryText)
+                            }
+                            
+                            Spacer()
+                            
+                            modelActionButton
+                        }
+                        
+                        if case .downloading(let progress) = modelManager.gemmaState {
+                            VStack(alignment: .leading, spacing: 6) {
+                                ProgressView(value: progress)
+                                    .tint(AppTheme.blue)
+                                
+                                Text("Downloading model... \(Int(progress * 100))%")
+                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(AppTheme.blue)
+                            }
+                        }
+                    }
+                    .padding(14)
+                    .background(Color.white.opacity(0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                }
+            }
+        }
+        .padding(18)
+        .appCard(cornerRadius: 30)
+    }
+
+    @ViewBuilder
+    private var modelActionButton: some View {
+        switch modelManager.gemmaState {
+        case .notDownloaded:
+            Button {
+                modelManager.downloadModel()
+            } label: {
+                Text("Download")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(AppTheme.blue)
+                    .clipShape(Capsule())
+            }
+            
+        case .downloading:
+            ProgressView()
+                .padding(8)
+            
+        case .downloaded:
+            Menu {
+                Button(role: .destructive) {
+                    modelManager.deleteModel()
+                } label: {
+                    Label("Delete Model", systemImage: "trash")
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text("Downloaded")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(.green)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.green.opacity(0.1))
+                .clipShape(Capsule())
+            }
+            
+        case .error(let message):
+            Button {
+                modelManager.downloadModel()
+            } label: {
+                Label("Retry", systemImage: "arrow.clockwise")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(.red)
+            }
+        }
     }
 
     private var supportCard: some View {

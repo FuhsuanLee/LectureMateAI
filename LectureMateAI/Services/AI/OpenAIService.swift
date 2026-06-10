@@ -8,7 +8,7 @@
 import AVFoundation
 import Foundation
 
-struct OpenAIService {
+struct OpenAIService: AIService {
     private let session: URLSession
     private let maxTranscriptionFileSizeBytes = 25 * 1024 * 1024
     private let preferredChunkFileSizeBytes = 18 * 1024 * 1024
@@ -19,7 +19,10 @@ struct OpenAIService {
         self.session = session
     }
 
-    func transcribeAudio(fileURL: URL) async throws -> String {
+    func transcribeAudio(
+        fileURL: URL,
+        onProgress: ((String, Double) -> Void)? = nil
+    ) async throws -> String {
         guard !OpenAIConfig.apiKey.isEmpty else {
             throw OpenAIError.missingAPIKey
         }
