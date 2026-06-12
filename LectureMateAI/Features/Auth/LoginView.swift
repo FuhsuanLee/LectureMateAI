@@ -7,22 +7,11 @@
 
 import SwiftUI
 
-private enum LoginField {
-    case email
-    case password
-}
-
 struct LoginView: View {
     @EnvironmentObject private var authManager: AuthManager
 
-    @State private var email = ""
-    @State private var password = ""
-    @FocusState private var focusedField: LoginField?
-
-    private var canLogin: Bool {
-        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
+    @State private var isSigningIn = false
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -33,15 +22,23 @@ struct LoginView: View {
                         heroCard
                         loginCard
                     }
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        focusedField = nil
-                    }
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
             .toolbar(.hidden, for: .navigationBar)
+            .alert("Sign-in failed", isPresented: errorAlertBinding) {
+                Button("OK", role: .cancel) { errorMessage = nil }
+            } message: {
+                Text(errorMessage ?? "")
+            }
         }
+    }
+
+    private var errorAlertBinding: Binding<Bool> {
+        Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )
     }
 
     private var topBranding: some View {
@@ -131,77 +128,26 @@ struct LoginView: View {
     }
 
     private var loginCard: some View {
-        VStack(spacing: 20) {
-            inputRow(systemImage: "envelope", placeholder: "Email address") {
-                TextField("Email address", text: $email)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.emailAddress)
-                    .autocorrectionDisabled()
-                    .focused($focusedField, equals: .email)
-                    .submitLabel(.next)
-                    .onSubmit {
-                        focusedField = .password
+        VStack(spacing: 16) {
+            Button(action: signInWithGitHub) {
+                HStack(spacing: 12) {
+                    if isSigningIn {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Image(systemName: "chevron.left.forwardslash.chevron.right")
                     }
-            }
-
-            inputRow(systemImage: "lock", placeholder: "Password") {
-                SecureField("Password", text: $password)
-                    .focused($focusedField, equals: .password)
-                    .submitLabel(.go)
-                    .onSubmit {
-                        submitLogin()
-                    }
-            }
-
-            HStack {
-                Spacer()
-
-                Text("Forgot password?")
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(AppTheme.blue)
-            }
-
-            Button(action: submitLogin) {
-                HStack(spacing: 10) {
-                    Image(systemName: "sparkles")
-                    Text("Login")
+                    Text(isSigningIn ? "Signing in…" : "Continue with GitHub")
                 }
             }
             .buttonStyle(AppPrimaryButtonStyle())
-            .disabled(!canLogin)
-            .opacity(canLogin ? 1.0 : 0.72)
+            .disabled(isSigningIn)
+            .opacity(isSigningIn ? 0.72 : 1.0)
 
-            HStack {
-                Rectangle()
-                    .fill(AppTheme.blue.opacity(0.10))
-                    .frame(height: 1)
-
-                Text("or")
-                    .font(.system(size: 16, weight: .medium, design: .rounded))
-                    .foregroundStyle(AppTheme.secondaryText)
-                    .padding(.horizontal, 12)
-
-                Rectangle()
-                    .fill(AppTheme.blue.opacity(0.10))
-                    .frame(height: 1)
-            }
-
-            Button { } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "apple.logo")
-                    Text("Continue with Apple")
-                }
-            }
-            .buttonStyle(AppSecondaryButtonStyle())
-
-            HStack(spacing: 6) {
-                Text("Don't have an account?")
-                    .foregroundStyle(AppTheme.secondaryText)
-
-                Text("Sign up")
-                    .foregroundStyle(AppTheme.blue)
-            }
-            .font(.system(size: 17, weight: .semibold, design: .rounded))
+            Text("Sign in with your GitHub account to get started.")
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .foregroundStyle(AppTheme.secondaryText)
+                .multilineTextAlignment(.center)
         }
         .padding(20)
         .appCard(cornerRadius: 32)
@@ -219,27 +165,25 @@ struct LoginView: View {
             .shadow(color: AppTheme.softShadow, radius: 16, x: 0, y: 10)
     }
 
-    private func inputRow<Content: View>(
-        systemImage: String,
-        placeholder: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: systemImage)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(AppTheme.blue)
-                .frame(width: 26)
-
-            content()
-                .font(.system(size: 17, weight: .medium, design: .rounded))
-                .foregroundStyle(AppTheme.ink)
+    private func signInWithGitHub() {
+        guard !isSigningIn else { return }
+        isSigningIn = true
+        Task {
+            let service = GitHubOAuthService()
+            do {
+                let profile = try await service.signIn()
+                authManager.completeGitHubLogin(
+                    token: profile.token,
+                    username: profile.username,
+                    displayName: profile.displayName,
+                    avatarURL: profile.avatarURL
+                )
+            } catch GitHubOAuthError.canceled {
+                // User dismissed the sheet; stay on the login screen silently.
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isSigningIn = false
         }
-        .appInputField()
-    }
-
-    private func submitLogin() {
-        guard canLogin else { return }
-        focusedField = nil
-        authManager.login(email: email, password: password)
     }
 }

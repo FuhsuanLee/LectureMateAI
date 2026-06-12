@@ -58,19 +58,13 @@ struct DashboardView: View {
     }
 
     private var displayName: String {
+        // Prefer the GitHub display name; fall back to the login handle.
+        let name = authManager.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !name.isEmpty { return name }
+
         let rawValue = authManager.username.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !rawValue.isEmpty else { return "Student" }
-
-        let candidate = rawValue.split(separator: "@").first.map(String.init) ?? rawValue
-        return candidate
-            .replacingOccurrences(of: ".", with: " ")
-            .split(separator: " ")
-            .map { $0.capitalized }
-            .joined(separator: " ")
-    }
-
-    private var firstName: String {
-        displayName.split(separator: " ").first.map(String.init) ?? displayName
+        return rawValue
     }
 
     var body: some View {
@@ -118,7 +112,7 @@ struct DashboardView: View {
 
     private var heroSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Hi \(firstName) 👋")
+            Text("Hi \(displayName) 👋")
                 .font(.system(size: 36, weight: .bold, design: .rounded))
                 .foregroundStyle(AppTheme.ink)
                 .lineLimit(1)
