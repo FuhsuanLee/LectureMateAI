@@ -70,9 +70,7 @@ struct NoteDetailView: View {
                 .font(.system(size: 24, weight: .bold, design: .rounded))
                 .foregroundStyle(AppTheme.ink)
 
-            MarkdownText(markdown: note.markdown)
-                .font(.system(size: 16, weight: .medium, design: .rounded))
-                .foregroundStyle(AppTheme.ink)
+            MarkdownContent(markdown: note.markdown)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .textSelection(.enabled)
                 .padding(20)
@@ -133,20 +131,6 @@ struct NoteDetailView: View {
         }
 
         return "Test your understanding with generated questions"
-    }
-}
-
-struct MarkdownText: View {
-    let markdown: String
-
-    var body: some View {
-        if let attributed = try? AttributedString(markdown: markdown) {
-            Text(attributed)
-                .lineSpacing(6)
-        } else {
-            Text(markdown)
-                .lineSpacing(6)
-        }
     }
 }
 
