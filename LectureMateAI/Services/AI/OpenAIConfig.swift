@@ -8,8 +8,9 @@
 import Foundation
 
 enum OpenAIConfig {
-    // Prototype only: paste your local key here for testing, but never commit a real API key to GitHub.
-    static let apiKey = ""
+    // Read at runtime from a bundled, gitignored Secrets.plist
+    // (see Secrets.example.plist). Never hardcode a real API key.
+    static let apiKey = Secrets.string("OpenAIApiKey")
     static let noteModel = "gpt-4o-mini"
     static let transcriptionModel = "gpt-4o-mini-transcribe"
     static let temperature = 0.7

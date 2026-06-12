@@ -17,5 +17,4 @@ build/
 .swiftpm/
 
 # Local secrets
-Secrets.*
-!Secrets.example.plist
+Secrets.plist
